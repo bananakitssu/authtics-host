@@ -16,6 +16,7 @@ import {
   serverBundleForTsx,
   ssgHtmlForTsx,
   getBuildStyle,
+  getBuildTrigger,
   //isTempUpToDate,
   writeTempFile,
   readTempFile,
@@ -470,9 +471,10 @@ function isCacheValid(
   serverCjsPath: string,
   templatePath: string | null,
   devPanelPath: string | null,
-  clientBundlePath?: string
+  clientBundlePath?: string,
+  serverBundleRequired = true
 ): boolean {
-  if (!fs.existsSync(tempPath) || !fs.existsSync(serverCjsPath)) return false;
+  if (!fs.existsSync(tempPath) || (serverBundleRequired && !fs.existsSync(serverCjsPath))) return false;
   if (clientBundlePath && !fs.existsSync(clientBundlePath)) return false;
   try {
     const cacheMtime = fs.statSync(tempPath).mtimeMs;
@@ -625,6 +627,7 @@ export async function renderPage(
   const serverCjsPath = serverBundleForTsx(tsxPath, cacheVariant, tempPath);
   const ssgHtmlPath = ssgHtmlForTsx(tsxPath, cacheVariant, tempPath);
   const requiredClientBundlePath = separateClientBundle ? clientBundlePath : undefined;
+  const serverCodeDisabled = renderMode === 'csr' || renderMode === 'srtws';
 
   // Fast-path: Return cached static HTML if SSG mode is active and valid
   if (renderMode === 'ssg' && isCacheValid(tsxPath, ssgHtmlPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath)) {
@@ -639,7 +642,7 @@ export async function renderPage(
   let serverCode: string | undefined;
   let freshWrite = false;
 
-  if (isCacheValid(tsxPath, tempPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath) && autoPaging) {
+  if (isCacheValid(tsxPath, tempPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath, !serverCodeDisabled) && (autoPaging || getBuildTrigger() === "prebuilt")) {
     try {
       const parsed = JSON.parse(readTempFile(tempPath));
       if (separateClientBundle) {
@@ -657,9 +660,7 @@ export async function renderPage(
     }
   }
 
-  const serverCodeDisabled = renderMode === 'csr' || renderMode === 'srtws';
-
-  if (!clientCode || (!serverCode && !serverCodeDisabled)) {
+  if (clientCode === undefined || (!serverCode && !serverCodeDisabled)) {
     //console.log(`[authtics] building bundle (${compiler}) for ${path.basename(tsxPath)}...`);
 
     const virtualServer = `
