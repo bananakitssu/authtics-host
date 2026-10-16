@@ -6,9 +6,9 @@ import path from "node:path";
 import fs from "node:fs";
 import url from "node:url";
 import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer } from "./renderEngine.js";
-import { setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
+import { setBuildStyle, setBuildTrigger, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
 import { initializeSuperBuildOutput, refreshSuperRouteManifest } from "./superBuildOutput.js";
-import type { BuildStyle } from "./config.js";
+import type { BuildStyle, BuildTrigger } from "./config.js";
 //import tls from 'tls';
 let config_: any = {};
 let uptime = 0;
@@ -675,6 +675,13 @@ async function start() {
   const buildStyle: BuildStyle = requestedBuildStyle;
   setBuildStyle(buildStyle, process.cwd());
 
+  const requestedBuildTrigger = config.buildTrigger ?? "default";
+  if (requestedBuildTrigger !== "default" && requestedBuildTrigger !== "prebuilt") {
+    throw new Error('[HostJS] Invalid buildTrigger. Expected "default" or "prebuilt".');
+  }
+  const buildTrigger: BuildTrigger = requestedBuildTrigger;
+  setBuildTrigger(buildTrigger);
+
   const PORT = config.port ?? 3000;
   const renderType = config.renderType ?? 'ssr';
   const showPanel = config.devMode !== false;
@@ -688,6 +695,95 @@ async function start() {
 
   if (buildStyle === "super") {
     initializeSuperBuildOutput(process.cwd(), config, pagesDir, publicDir);
+  }
+
+  if (buildTrigger === "prebuilt") {
+    const prebuildSources = new Map<string, { filePath: string; requestPath: string }>();
+
+    const addPrebuildSource = (filePath: string, requestPath: string): void => {
+      const absolutePath = path.resolve(process.cwd(), filePath);
+      if (!/\.tsx$/i.test(absolutePath) || !fs.existsSync(absolutePath)) return;
+      if (!fs.statSync(absolutePath).isFile()) return;
+      if (!prebuildSources.has(absolutePath)) {
+        prebuildSources.set(absolutePath, { filePath: absolutePath, requestPath });
+      }
+    };
+
+    if (pagesDir && fs.existsSync(pagesDir)) {
+      const visitPages = (directory: string): void => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+          if (entry.name === "node_modules" || entry.name === ".git" ||
+              entry.name === ".hostjs" || entry.name === ".authtics_host") continue;
+
+          // API handlers use their own request-time loader, not the TSX renderer.
+          if (path.resolve(directory) === path.resolve(pagesDir) && entry.name === "api" && entry.isDirectory()) continue;
+
+          const entryPath = path.join(directory, entry.name);
+          if (entry.isDirectory()) {
+            visitPages(entryPath);
+            continue;
+          }
+
+          if (entry.isFile() && /\.tsx$/i.test(entry.name)) {
+            const relativeRoute = path.relative(pagesDir, entryPath)
+              .replace(/\.tsx$/i, "")
+              .split(path.sep)
+              .join("/");
+            const requestPath = relativeRoute.toLowerCase() === "index"
+              ? "/"
+              : `/${relativeRoute}`;
+            addPrebuildSource(entryPath, requestPath);
+          }
+        }
+      };
+      visitPages(pagesDir);
+    }
+
+    const appEntry = routes.get("APP_TSX");
+    if (typeof appEntry === "string") addPrebuildSource(appEntry, "/");
+
+    const sources = [...prebuildSources.values()].sort((a, b) =>
+      a.requestPath.localeCompare(b.requestPath) || a.filePath.localeCompare(b.filePath)
+    );
+    const datVariants: Array<string | undefined> =
+      !showPanel || config.dat === undefined
+        ? [undefined]
+        : Array.isArray(config.dat)
+          ? config.dat.length > 0 ? [undefined, config.dat[0]] : [undefined]
+          : [undefined, config.dat];
+
+    console.log(`[HostJS] Prebuilding ${sources.length} TSX page(s)...`);
+    for (const source of sources) {
+      for (const requestDAT of datVariants) {
+        try {
+          await renderPage(
+            source.filePath,
+            source.requestPath,
+            showPanel,
+            compiler,
+            hotReload,
+            autoPaging,
+            config.autoPageDir,
+            (routes.get("APP_TSX") || "") as string,
+            (bundle, bundlePath) => {
+              routes.set(`GET:${bundlePath}`, (_req, res) => {
+                res.setHeader("Content-Type", "application/javascript");
+                res.end(bundle);
+              });
+            },
+            (bundlePath) => { routes.delete(`GET:${bundlePath}`); },
+            requestDAT,
+            config.dat,
+            renderType,
+            config.patchForSsr
+          );
+        } catch (error: any) {
+          const detail = error instanceof Error ? error.message : String(error);
+          throw new Error(`[HostJS] Prebuild failed for ${source.requestPath} (${source.filePath}): ${detail}`);
+        }
+      }
+    }
+    console.log(`[HostJS] Prebuild complete (${sources.length} TSX page(s)).`);
   }
 
   const server = createServer(async (req, res) => {
