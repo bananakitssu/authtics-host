@@ -580,7 +580,8 @@ export async function renderPage(
   reqDAT?: string | undefined,
   configDAT?: string | string[] | undefined,
   renderMode: RenderMode = 'ssr',
-  patchForServer = false
+  patchForServer = false,
+  prebuildOnly = false
 ): Promise<string> {
   ensureTempDirs();
 
@@ -733,6 +734,10 @@ export async function renderPage(
   }
 
   fileHandler ? fileHandler(clientCode || "", `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`) : null;
+
+  // The prebuilt trigger compiles bundles at startup without invoking an SSR
+  // page component. SSG is the exception because it must emit static HTML.
+  if (prebuildOnly && renderMode !== 'ssg') return "";
 
   let pageHtml = "";
   let devPanelContainer = usesDevPanel
