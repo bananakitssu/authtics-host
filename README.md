@@ -125,6 +125,21 @@ export default function Index () {
 }
 ```
 
+## Build Output Styles
+
+HostJS supports two output layouts through `buildStyle` in `authtics_host.config.ts`.
+
+- `default` (the default) keeps the existing `.authtics_host/` cache layout.
+- `super` enables the Next.js-inspired `.hostjs/` layout with separated client/server bundler caches, route-cache files, route and middleware manifests, generated route type files, diagnostics metadata, and trace directories.
+
+To opt in, add this to your existing `defineConfig({ ... })` object:
+
+```ts
+buildStyle: "super"
+```
+
+The setting is opt-in, so projects that do not specify it continue using `default`.
+
 ## To Run The Project
 
 Make sure **Node 22** is installed:

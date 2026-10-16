@@ -1,54 +1,141 @@
 // src/rendererTempFiles.ts
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import type { BuildStyle } from "./config.js";
 
-// ---------------------------------------------------------------------------
-// Directory layout:
-//   <project>/.authtics_host/
-//     cache/          ← compiled server+client bundles (JSON, keyed by source)
-// ---------------------------------------------------------------------------
+let activeBuildStyle: BuildStyle = "default";
+let activeProjectRoot = process.cwd();
 
-const AUTHTICS_DIR = path.join(process.cwd(), ".authtics_host");
-const DEV_CACHE_DIR = path.join(AUTHTICS_DIR, "dev-cache");
-const CACHE_DIR = path.join(AUTHTICS_DIR, "cache");
+function hostjsDir(): string {
+  return path.join(activeProjectRoot, ".hostjs");
+}
 
-export function ensureTempDirs(): void {
-  if (!fs.existsSync(AUTHTICS_DIR)) fs.mkdirSync(AUTHTICS_DIR, { recursive: true });
-  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
-  if (!fs.existsSync(DEV_CACHE_DIR)) fs.mkdirSync(DEV_CACHE_DIR, { recursive: true });
+function legacyDir(): string {
+  return path.join(activeProjectRoot, ".authtics_host");
+}
+
+function artifactName(tsxPath: string, variant = "normal"): string {
+  const base = path.basename(tsxPath);
+  const hash = simpleHash(`${tsxPath}:${variant}`);
+  return `${base}_${hash}`;
 }
 
 /**
- * Returns the cache file path for a given source .tsx file.
- * Uses the basename + a short hash of the full path to avoid collisions
- * between files named the same thing in different directories.
- *
- * Example: /project/pages/about.tsx → .authtics_host/cache/about.tsx_a3f9b2.json
+ * Sets the output layout for this HostJS app. Call once after loading config,
+ * before rendering pages, so every renderer uses the same output root.
  */
-export function tempFileForTsx(
+export function setBuildStyle(style: BuildStyle, projectRoot = process.cwd()): void {
+  if (style !== "default" && style !== "super") {
+    throw new Error('[HostJS] Invalid buildStyle. Expected "default" or "super".');
+  }
+  activeBuildStyle = style;
+  activeProjectRoot = path.resolve(projectRoot);
+  ensureTempDirs();
+}
+
+export function getBuildStyle(): BuildStyle {
+  return activeBuildStyle;
+}
+
+export function getBuildOutputRoot(): string {
+  return activeBuildStyle === "super" ? hostjsDir() : legacyDir();
+}
+
+export function ensureTempDirs(): void {
+  if (activeBuildStyle === "default") {
+    fs.mkdirSync(legacyDir(), { recursive: true });
+    fs.mkdirSync(path.join(legacyDir(), "cache"), { recursive: true });
+    fs.mkdirSync(path.join(legacyDir(), "dev-cache"), { recursive: true });
+    return;
+  }
+
+  const dirs = [
+    path.join(hostjsDir(), "cache", "bundler", "client-production"),
+    path.join(hostjsDir(), "cache", "bundler", "server-production"),
+    path.join(hostjsDir(), "cache", "bundler", "edge-server-production"),
+    path.join(hostjsDir(), "diagnostics"),
+    path.join(hostjsDir(), "server", "app"),
+    path.join(hostjsDir(), "server", "pages"),
+    path.join(hostjsDir(), "server", "chunks"),
+    path.join(hostjsDir(), "server", "route-cache"),
+    path.join(hostjsDir(), "types", "app"),
+    path.join(hostjsDir(), "dev"),
+    path.join(hostjsDir(), "trace"),
+    path.join(hostjsDir(), "trace-build"),
+  ];
+  for (const dir of dirs) fs.mkdirSync(dir, { recursive: true });
+}
+
+/**
+ * Returns the JSON metadata/cache file for a TSX source file.
+ * The basename and short hash avoid collisions between similarly named routes.
+ */
+export function tempFileForTsx(tsxPath: string, variant = "normal"): string {
+  ensureTempDirs();
+  const name = artifactName(tsxPath, variant);
+  const dir = activeBuildStyle === "super"
+    ? path.join(hostjsDir(), "server", "route-cache")
+    : path.join(legacyDir(), "cache");
+  return path.join(dir, `${name}.json`);
+}
+
+export function clientBundleForTsx(tsxPath: string, variant = "normal"): string {
+  ensureTempDirs();
+  if (activeBuildStyle === "default") {
+    return tempFileForTsx(tsxPath, variant).replace(/\.json$/, ".client.js");
+  }
+  return path.join(
+    hostjsDir(),
+    "cache",
+    "bundler",
+    "client-production",
+    `${artifactName(tsxPath, variant)}.js`
+  );
+}
+
+export function serverBundleForTsx(
   tsxPath: string,
-  variant = "normal"
+  variant = "normal",
+  tempPath?: string
 ): string {
   ensureTempDirs();
-
-  const base = path.basename(tsxPath);
-  const hash = simpleHash(`${tsxPath}:${variant}`);
-
+  if (activeBuildStyle === "default") {
+    return (tempPath ?? tempFileForTsx(tsxPath, variant)).replace(/\.json$/, ".server.cjs");
+  }
   return path.join(
-    CACHE_DIR,
-    `${base}_${hash}.json`
+    hostjsDir(),
+    "cache",
+    "bundler",
+    "server-production",
+    `${artifactName(tsxPath, variant)}.server.cjs`
+  );
+}
+
+export function ssgHtmlForTsx(
+  tsxPath: string,
+  variant = "normal",
+  tempPath?: string
+): string {
+  ensureTempDirs();
+  if (activeBuildStyle === "default") {
+    return (tempPath ?? tempFileForTsx(tsxPath, variant)).replace(/\.json$/, ".ssg.html");
+  }
+  return path.join(
+    hostjsDir(),
+    "server",
+    "route-cache",
+    `${artifactName(tsxPath, variant)}.ssg.html`
   );
 }
 
 export function tempFileForDev(): string {
   ensureTempDirs();
-  return path.join(DEV_CACHE_DIR, "page.cache.json")
+  return activeBuildStyle === "super"
+    ? path.join(hostjsDir(), "dev", "page.cache.json")
+    : path.join(legacyDir(), "dev-cache", "page.cache.json");
 }
 
-/**
- * Returns true if the cache file exists and is at least as new as the source file.
- */
+/** Returns true if the cache file exists and is at least as new as the source file. */
 export function isTempUpToDate(tsxPath: string, tempPath: string): boolean {
   try {
     const srcMtime = fs.statSync(tsxPath).mtimeMs;
@@ -60,6 +147,7 @@ export function isTempUpToDate(tsxPath: string, tempPath: string): boolean {
 }
 
 export function writeTempFile(tempPath: string, content: string): void {
+  fs.mkdirSync(path.dirname(tempPath), { recursive: true });
   fs.writeFileSync(tempPath, content, "utf-8");
 }
 
@@ -67,19 +155,20 @@ export function readTempFile(tempPath: string): string {
   return fs.readFileSync(tempPath, "utf-8");
 }
 
-/**
- * Wipes the entire cache directory. Useful for a `authtics clean` CLI command.
- */
+/** Clears compiler and route caches without deleting manifests or diagnostics. */
 export function clearCache(): void {
-  if (fs.existsSync(CACHE_DIR)) {
-    fs.rmSync(CACHE_DIR, { recursive: true, force: true });
+  if (activeBuildStyle === "default") {
+    fs.rmSync(path.join(legacyDir(), "cache"), { recursive: true, force: true });
+  } else {
+    for (const dir of [
+      path.join(hostjsDir(), "cache", "bundler"),
+      path.join(hostjsDir(), "server", "route-cache"),
+    ]) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   }
   ensureTempDirs();
 }
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
 
 /** Tiny non-cryptographic hash — good enough to avoid filename collisions. */
 function simpleHash(str: string): string {
