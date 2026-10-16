@@ -1,9 +1,10 @@
 // src/rendererTempFiles.ts
 import fs from "node:fs";
 import path from "node:path";
-import type { BuildStyle } from "./config.js";
+import type { BuildStyle, BuildTrigger } from "./config.js";
 
 let activeBuildStyle: BuildStyle = "default";
+let activeBuildTrigger: BuildTrigger = "default";
 let activeProjectRoot = process.cwd();
 
 function hostjsDir(): string {
@@ -35,6 +36,17 @@ export function setBuildStyle(style: BuildStyle, projectRoot = process.cwd()): v
 
 export function getBuildStyle(): BuildStyle {
   return activeBuildStyle;
+}
+
+export function setBuildTrigger(trigger: BuildTrigger): void {
+  if (trigger !== "default" && trigger !== "prebuilt") {
+    throw new Error('[HostJS] Invalid buildTrigger. Expected "default" or "prebuilt".');
+  }
+  activeBuildTrigger = trigger;
+}
+
+export function getBuildTrigger(): BuildTrigger {
+  return activeBuildTrigger;
 }
 
 export function getBuildOutputRoot(): string {
