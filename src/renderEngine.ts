@@ -12,6 +12,10 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import {
   tempFileForTsx,
+  clientBundleForTsx,
+  serverBundleForTsx,
+  ssgHtmlForTsx,
+  getBuildStyle,
   //isTempUpToDate,
   writeTempFile,
   readTempFile,
@@ -465,9 +469,11 @@ function isCacheValid(
   tempPath: string,
   serverCjsPath: string,
   templatePath: string | null,
-  devPanelPath: string | null
+  devPanelPath: string | null,
+  clientBundlePath?: string
 ): boolean {
   if (!fs.existsSync(tempPath) || !fs.existsSync(serverCjsPath)) return false;
+  if (clientBundlePath && !fs.existsSync(clientBundlePath)) return false;
   try {
     const cacheMtime = fs.statSync(tempPath).mtimeMs;
     // Page file changed?
@@ -614,11 +620,14 @@ export async function renderPage(
   ].join("-");
 
   const tempPath = tempFileForTsx(tsxPath, cacheVariant);
-  const serverCjsPath = tempPath.replace(/\.json$/, ".server.cjs");
-  const ssgHtmlPath = tempPath.replace(/\.json$/, ".ssg.html");
+  const separateClientBundle = getBuildStyle() === "super";
+  const clientBundlePath = clientBundleForTsx(tsxPath, cacheVariant);
+  const serverCjsPath = serverBundleForTsx(tsxPath, cacheVariant, tempPath);
+  const ssgHtmlPath = ssgHtmlForTsx(tsxPath, cacheVariant, tempPath);
+  const requiredClientBundlePath = separateClientBundle ? clientBundlePath : undefined;
 
   // Fast-path: Return cached static HTML if SSG mode is active and valid
-  if (renderMode === 'ssg' && isCacheValid(tsxPath, ssgHtmlPath, serverCjsPath, templatePath, devPanelPath)) {
+  if (renderMode === 'ssg' && isCacheValid(tsxPath, ssgHtmlPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath)) {
     try {
       return fs.readFileSync(ssgHtmlPath, "utf-8");
     } catch {
@@ -630,10 +639,17 @@ export async function renderPage(
   let serverCode: string | undefined;
   let freshWrite = false;
 
-  if (isCacheValid(tsxPath, tempPath, serverCjsPath, templatePath, devPanelPath) && autoPaging) {
+  if (isCacheValid(tsxPath, tempPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath) && autoPaging) {
     try {
       const parsed = JSON.parse(readTempFile(tempPath));
-      clientCode = parsed.clientCode;
+      if (separateClientBundle) {
+        const expectedBundleRef = path.relative(process.cwd(), clientBundlePath);
+        clientCode = parsed.clientBundle === expectedBundleRef
+          ? fs.readFileSync(clientBundlePath, "utf-8")
+          : undefined;
+      } else {
+        clientCode = parsed.clientCode;
+      }
       serverCode = fs.readFileSync(serverCjsPath, "utf-8");
       //console.log(`[authtics] using cached bundle for ${path.basename(tsxPath)}`);
     } catch {
@@ -702,9 +718,16 @@ export async function renderPage(
     /*fs.writeFileSync(serverCjsPath, serverCode || "", "utf-8");
     writeTempFile(tempPath, JSON.stringify({ clientCode }));
     freshWrite = true;*/
-    if (serverCode) await fs.promises.writeFile(serverCjsPath, serverCode || "", "utf-8");
-  writeTempFile(tempPath, JSON.stringify({ clientCode }));
-  freshWrite = true;
+    if (serverCode) await fs.promises.writeFile(serverCjsPath, serverCode, "utf-8");
+    if (separateClientBundle) {
+      await fs.promises.writeFile(clientBundlePath, clientCode ?? "", "utf-8");
+      writeTempFile(tempPath, JSON.stringify({
+        clientBundle: path.relative(process.cwd(), clientBundlePath),
+      }));
+    } else {
+      writeTempFile(tempPath, JSON.stringify({ clientCode }));
+    }
+    freshWrite = true;
     //console.log(`[authtics] bundle cached for ${path.basename(tsxPath)}`);
   }
 
