@@ -146,11 +146,11 @@ node --experimental-strip-types index.ts
 
 Then when you run your project, you will get a page just saying **"Hello, World!"** and you should see a clickable Developer Panel at the bottom-right.
 
-[Result](assets/result.jpg)
+![Result](assets/result.jpg)
 
 ## About The Developer Panel
 
-[Developer Panel](assets/dev_panel.jpg)
+![Developer Panel](assets/dev_panel.jpg)
 
 The Developer Panel is what you could use to help you debug your code. The Developer Panel has **8 tabs**:
 
