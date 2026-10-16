@@ -16,6 +16,7 @@ import {
   serverBundleForTsx,
   ssgHtmlForTsx,
   getBuildStyle,
+  getBuildTrigger,
   //isTempUpToDate,
   writeTempFile,
   readTempFile,
@@ -470,9 +471,10 @@ function isCacheValid(
   serverCjsPath: string,
   templatePath: string | null,
   devPanelPath: string | null,
-  clientBundlePath?: string
+  clientBundlePath?: string,
+  serverBundleRequired = true
 ): boolean {
-  if (!fs.existsSync(tempPath) || !fs.existsSync(serverCjsPath)) return false;
+  if (!fs.existsSync(tempPath) || (serverBundleRequired && !fs.existsSync(serverCjsPath))) return false;
   if (clientBundlePath && !fs.existsSync(clientBundlePath)) return false;
   try {
     const cacheMtime = fs.statSync(tempPath).mtimeMs;
@@ -578,7 +580,8 @@ export async function renderPage(
   reqDAT?: string | undefined,
   configDAT?: string | string[] | undefined,
   renderMode: RenderMode = 'ssr',
-  patchForServer = false
+  patchForServer = false,
+  prebuildOnly = false
 ): Promise<string> {
   ensureTempDirs();
 
@@ -625,6 +628,7 @@ export async function renderPage(
   const serverCjsPath = serverBundleForTsx(tsxPath, cacheVariant, tempPath);
   const ssgHtmlPath = ssgHtmlForTsx(tsxPath, cacheVariant, tempPath);
   const requiredClientBundlePath = separateClientBundle ? clientBundlePath : undefined;
+  const serverCodeDisabled = renderMode === 'csr' || renderMode === 'srtws';
 
   // Fast-path: Return cached static HTML if SSG mode is active and valid
   if (renderMode === 'ssg' && isCacheValid(tsxPath, ssgHtmlPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath)) {
@@ -639,7 +643,7 @@ export async function renderPage(
   let serverCode: string | undefined;
   let freshWrite = false;
 
-  if (isCacheValid(tsxPath, tempPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath) && autoPaging) {
+  if (isCacheValid(tsxPath, tempPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath, !serverCodeDisabled) && (autoPaging || getBuildTrigger() === "prebuilt")) {
     try {
       const parsed = JSON.parse(readTempFile(tempPath));
       if (separateClientBundle) {
@@ -650,16 +654,14 @@ export async function renderPage(
       } else {
         clientCode = parsed.clientCode;
       }
-      serverCode = fs.readFileSync(serverCjsPath, "utf-8");
+      serverCode = serverCodeDisabled ? undefined : fs.readFileSync(serverCjsPath, "utf-8");
       //console.log(`[authtics] using cached bundle for ${path.basename(tsxPath)}`);
     } catch {
       // corrupt — rebuild
     }
   }
 
-  const serverCodeDisabled = renderMode === 'csr' || renderMode === 'srtws';
-
-  if (!clientCode || (!serverCode && !serverCodeDisabled)) {
+  if (clientCode === undefined || (clientCode === "" && renderMode !== "srtws") || (!serverCode && !serverCodeDisabled)) {
     //console.log(`[authtics] building bundle (${compiler}) for ${path.basename(tsxPath)}...`);
 
     const virtualServer = `
@@ -732,6 +734,10 @@ export async function renderPage(
   }
 
   fileHandler ? fileHandler(clientCode || "", `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`) : null;
+
+  // The prebuilt trigger compiles bundles at startup without invoking an SSR
+  // page component. SSG is the exception because it must emit static HTML.
+  if (prebuildOnly && renderMode !== 'ssg') return "";
 
   let pageHtml = "";
   let devPanelContainer = usesDevPanel

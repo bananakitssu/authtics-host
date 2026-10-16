@@ -1,4 +1,5 @@
 export type BuildStyle = 'default' | 'super';
+export type BuildTrigger = 'default' | 'prebuilt';
 
 export interface AuthticsConfig {
   port?: number;
@@ -8,6 +9,12 @@ export interface AuthticsConfig {
    * - super: use the Next.js-inspired .hostjs output layout.
    */
   buildStyle?: BuildStyle;
+  /**
+   * Selects when page bundles are built.
+   * - default: build on demand when a request needs the page.
+   * - prebuilt: build discoverable TSX pages before the server starts listening.
+   */
+  buildTrigger?: BuildTrigger;
   /**
    * @deprecated Use `renderType` instead.
    * Setting this to `true` is equivalent to `renderType: 'ssr'`.
@@ -37,6 +44,10 @@ export function defineConfig(config: AuthticsConfig): AuthticsConfig {
   if (config.buildStyle == undefined) config.buildStyle = 'default';
   if (config.buildStyle !== 'default' && config.buildStyle !== 'super') {
     throw new Error('[HostJS] Invalid buildStyle. Expected "default" or "super".');
+  }
+  if (config.buildTrigger == undefined) config.buildTrigger = 'default';
+  if (config.buildTrigger !== 'default' && config.buildTrigger !== 'prebuilt') {
+    throw new Error('[HostJS] Invalid buildTrigger. Expected "default" or "prebuilt".');
   }
 
   if (config.autoPage == undefined) config.autoPage = true;
