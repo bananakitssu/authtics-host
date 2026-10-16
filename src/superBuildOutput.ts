@@ -89,9 +89,7 @@ function collectRoutes(
   }
 
   const unique = new Map<string, HostJSRouteRecord>();
-  for (const route of routes) {
-    unique.set(`${route.kind}:${route.pathname}`, route);
-  }
+  for (const route of routes) unique.set(`${route.kind}:${route.pathname}`, route);
 
   return [...unique.values()].sort((a, b) =>
     a.pathname.localeCompare(b.pathname) || a.kind.localeCompare(b.kind)
@@ -103,69 +101,39 @@ function typeUnion(values: string[]): string {
   return unique.length ? unique.map((value) => JSON.stringify(value)).join(" | ") : "never";
 }
 
-/**
- * Creates the Super build layout and refreshes its project metadata/manifests.
- * This does not replace HostJS's live router; manifests describe the routes that
- * can be discovered from the configured pages and public directories.
- */
-export function initializeSuperBuildOutput(
-  projectRoot: string,
+function resolveDirectories(
+  root: string,
+  config: AuthticsConfig,
+  pagesDir?: string,
+  publicDir?: string
+): { pagesDir?: string; publicDir?: string } {
+  return {
+    pagesDir: config.autoPage === true
+      ? pagesDir ?? path.join(root, config.autoPageDir || "")
+      : undefined,
+    publicDir: config.autoFile === true
+      ? publicDir ?? path.join(root, config.autoFileDir || "")
+      : undefined,
+  };
+}
+
+function writeRouteManifestAndTypes(
+  root: string,
+  outputDir: string,
   config: AuthticsConfig,
   pagesDir?: string,
   publicDir?: string
 ): void {
-  const root = path.resolve(projectRoot);
-  const outputDir = path.join(root, HOSTJS_DIR);
-  const projectPackage = readJson(path.join(root, "package.json"));
-  const pagesEnabled = config.autoPage === true;
-  const filesEnabled = config.autoFile === true;
-  const effectivePagesDir = pagesEnabled
-    ? pagesDir ?? path.join(root, config.autoPageDir || "")
-    : undefined;
-  const effectivePublicDir = filesEnabled
-    ? publicDir ?? path.join(root, config.autoFileDir || "")
-    : undefined;
-  const routes = collectRoutes(root, effectivePagesDir, effectivePublicDir);
-
-  fs.mkdirSync(outputDir, { recursive: true });
-
-  writeJson(path.join(outputDir, "package.json"), {
-    schemaVersion: 1,
-    framework: "@bananacool467/authtics-host",
-    frameworkName: "Authtics Host",
-    shortName: "HostJS",
-    buildStyle: "super",
-    project: {
-      name: typeof projectPackage.name === "string" ? projectPackage.name : path.basename(root),
-      version: typeof projectPackage.version === "string" ? projectPackage.version : null,
-    },
-  });
-
-  writeJson(path.join(outputDir, "diagnostics", "framework.json"), {
-    name: "Authtics Host",
-    shortName: "HostJS",
-    buildStyle: "super",
-    schemaVersion: 1,
-  });
-
-  // A new server start begins a fresh in-memory build/diagnostic session.
-  writeJson(path.join(outputDir, "diagnostics", "build-diagnostics.json"), {
-    version: 1,
-    diagnostics: [],
-  });
+  const directories = resolveDirectories(root, config, pagesDir, publicDir);
+  const routes = collectRoutes(root, directories.pagesDir, directories.publicDir);
 
   writeJson(path.join(outputDir, "server", "routes-manifest.json"), {
     version: 1,
     generatedBy: "HostJS",
     buildStyle: "super",
-    pagesDirectory: effectivePagesDir ? toProjectPath(root, effectivePagesDir) : null,
-    publicDirectory: effectivePublicDir ? toProjectPath(root, effectivePublicDir) : null,
+    pagesDirectory: directories.pagesDir ? toProjectPath(root, directories.pagesDir) : null,
+    publicDirectory: directories.publicDir ? toProjectPath(root, directories.publicDir) : null,
     routes,
-  });
-
-  writeJson(path.join(outputDir, "server", "middleware-manifest.json"), {
-    version: 1,
-    middleware: [],
   });
 
   const pageRoutes = routes.filter((route) => route.kind === "page").map((route) => route.pathname);
@@ -209,9 +177,70 @@ export type { HostJSPageRoute, HostJSApiRoute, HostJSStaticRoute } from "../rout
 `,
     "utf-8"
   );
+}
 
-  const traceDir = path.join(outputDir, "trace");
-  const traceBuildDir = path.join(outputDir, "trace-build");
-  fs.mkdirSync(traceDir, { recursive: true });
-  fs.mkdirSync(traceBuildDir, { recursive: true });
+/** Refreshes route metadata after a source-file change during hot reload. */
+export function refreshSuperRouteManifest(
+  projectRoot: string,
+  config: AuthticsConfig,
+  pagesDir?: string,
+  publicDir?: string
+): void {
+  const root = path.resolve(projectRoot);
+  const outputDir = path.join(root, HOSTJS_DIR);
+  if (!fs.existsSync(outputDir)) return;
+  writeRouteManifestAndTypes(root, outputDir, config, pagesDir, publicDir);
+}
+
+/**
+ * Creates the Super output layout and refreshes its project metadata/manifests.
+ * The live router remains HostJS's existing router; the manifest describes routes
+ * discovered from the configured pages and public directories.
+ */
+export function initializeSuperBuildOutput(
+  projectRoot: string,
+  config: AuthticsConfig,
+  pagesDir?: string,
+  publicDir?: string
+): void {
+  const root = path.resolve(projectRoot);
+  const outputDir = path.join(root, HOSTJS_DIR);
+  const projectPackage = readJson(path.join(root, "package.json"));
+
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  writeJson(path.join(outputDir, "package.json"), {
+    schemaVersion: 1,
+    framework: "@bananacool467/authtics-host",
+    frameworkName: "Authtics Host",
+    shortName: "HostJS",
+    buildStyle: "super",
+    project: {
+      name: typeof projectPackage.name === "string" ? projectPackage.name : path.basename(root),
+      version: typeof projectPackage.version === "string" ? projectPackage.version : null,
+    },
+  });
+
+  writeJson(path.join(outputDir, "diagnostics", "framework.json"), {
+    name: "Authtics Host",
+    shortName: "HostJS",
+    buildStyle: "super",
+    schemaVersion: 1,
+  });
+
+  // A new server start begins a fresh build/diagnostic session.
+  writeJson(path.join(outputDir, "diagnostics", "build-diagnostics.json"), {
+    version: 1,
+    diagnostics: [],
+  });
+
+  writeJson(path.join(outputDir, "server", "middleware-manifest.json"), {
+    version: 1,
+    middleware: [],
+  });
+
+  writeRouteManifestAndTypes(root, outputDir, config, pagesDir, publicDir);
+
+  fs.mkdirSync(path.join(outputDir, "trace"), { recursive: true });
+  fs.mkdirSync(path.join(outputDir, "trace-build"), { recursive: true });
 }
