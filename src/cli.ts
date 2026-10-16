@@ -6,7 +6,9 @@ import path from "node:path";
 import fs from "node:fs";
 import url from "node:url";
 import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer } from "./renderEngine.js";
-import { tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js"
+import { setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
+import { initializeSuperBuildOutput } from "./superBuildOutput.js";
+import type { BuildStyle } from "./config.js";
 //import tls from 'tls';
 let config_: any = {};
 let uptime = 0;
@@ -40,6 +42,7 @@ function safeWatch(target: string, onChange: () => void): void {
     if (!filename) return false;
     // Never react to cache/build artifacts
     if (filename.includes('.authtics_host')) return false;
+    if (filename.includes('.hostjs')) return false;
     if (filename.includes('.upm')) return false;
     if (filename.includes('.tsbuildinfo')) return false;
     if (filename.includes('.local')) return false;
@@ -665,6 +668,13 @@ async function start() {
     //console.log("ℹ️  No config found, using defaults.");
   }
   
+  const requestedBuildStyle = config.buildStyle ?? "default";
+  if (requestedBuildStyle !== "default" && requestedBuildStyle !== "super") {
+    throw new Error('[HostJS] Invalid buildStyle. Expected "default" or "super".');
+  }
+  const buildStyle: BuildStyle = requestedBuildStyle;
+  setBuildStyle(buildStyle, process.cwd());
+
   const PORT = config.port ?? 3000;
   const renderType = config.renderType ?? 'ssr';
   const showPanel = config.devMode !== false;
@@ -675,6 +685,10 @@ async function start() {
   const pagesDir = config.autoPage === true ? path.join(process.cwd(), config.autoPageDir || "") : undefined;
   const publicDir = config.autoFile === true ? path.join(process.cwd(), config.autoFileDir || "") : undefined;
   const apiDir = pagesDir ? path.join(pagesDir, "api") : undefined;
+
+  if (buildStyle === "super") {
+    initializeSuperBuildOutput(process.cwd(), config, pagesDir, publicDir);
+  }
 
   const server = createServer(async (req, res) => {
     //const body = await getJsonBody(req) as any;
