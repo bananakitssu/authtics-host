@@ -653,7 +653,7 @@ export async function renderPage(
       } else {
         clientCode = parsed.clientCode;
       }
-      serverCode = fs.readFileSync(serverCjsPath, "utf-8");
+      serverCode = serverCodeDisabled ? undefined : fs.readFileSync(serverCjsPath, "utf-8");
       //console.log(`[authtics] using cached bundle for ${path.basename(tsxPath)}`);
     } catch {
       // corrupt — rebuild
