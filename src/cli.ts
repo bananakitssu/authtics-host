@@ -775,7 +775,8 @@ async function start() {
             requestDAT,
             config.dat,
             renderType,
-            config.patchForSsr
+            config.patchForSsr,
+            renderType !== 'ssg'
           );
         } catch (error: any) {
           const detail = error instanceof Error ? error.message : String(error);
