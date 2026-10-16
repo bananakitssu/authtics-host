@@ -1,0 +1,80 @@
+{
+  "name": "@bananacool467/authtics-host",
+  "version": "0.2.6",
+  "description": "Authtics Host, A Next.js-inspired web framework for Node.js and React with TypeScript and JSX support.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "sideEffects": false,
+  "bin": {
+    "host": "dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && node dist/index.js",
+    "playgroundTest": "npm run build && cd playground && node --experimental-strip-types index.ts",
+    "playgroundTest2": "npm run build && cd playground2 && node --experimental-strip-types index.ts"
+  },
+  "keywords": [
+    "authtics",
+    "host",
+    "server-side-rendering",
+    "ssr",
+    "ssg",
+    "csr",
+    "srtws",
+    "framework",
+    "nodejs",
+    "typescript",
+    "react",
+    "tsx",
+    "jsx",
+    "html",
+    "js",
+    "lightweight",
+    "hot-reload",
+    "dev",
+    "developer",
+    "HostJS",
+    "Host.js",
+    "website"
+  ],
+  "author": "bananacool467",
+  "license": "MIT",
+  "dependencies": {
+    "@bananacool467/ui-tools": "^0.2.2-beta",
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "esbuild": "^0.28.2",
+    "jiti": "^2.6.1",
+    "lucide-react": "^0.577.0",
+    "prismjs": "^1.30.0",
+    "ws": "^8.21.3"
+  },
+  "peerDependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.0",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
+    "@types/babel__core": "^7.20.5",
+    "@types/babel__preset-env": "^7.10.0",
+    "@types/node": "^22.13.11",
+    "@types/prismjs": "^1.26.6",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/ws": "^8.18.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bananakitssu/authtics-host"
+  }
+}
