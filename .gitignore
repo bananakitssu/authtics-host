@@ -154,3 +154,6 @@ publish.sh
 strip.js
 
 .replit
+
+# HostJS Super build output
+.hostjs/
