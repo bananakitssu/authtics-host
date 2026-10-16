@@ -11,7 +11,7 @@ export interface AuthticsConfig {
   buildStyle?: BuildStyle;
   /**
    * Selects when page bundles are built.
-   * - default: build on the first client request that needs the page.
+   * - default: build on demand when a request needs the page.
    * - prebuilt: build discoverable TSX pages before the server starts listening.
    */
   buildTrigger?: BuildTrigger;
