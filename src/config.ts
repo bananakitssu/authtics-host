@@ -1,7 +1,15 @@
+export type BuildStyle = 'default' | 'super';
+
 export interface AuthticsConfig {
   port?: number;
-  /** 
-   * @deprecated Use `renderType` instead. 
+  /**
+   * Selects the build output layout.
+   * - default: preserve the existing .authtics_host cache layout.
+   * - super: use the Next.js-inspired .hostjs output layout.
+   */
+  buildStyle?: BuildStyle;
+  /**
+   * @deprecated Use `renderType` instead.
    * Setting this to `true` is equivalent to `renderType: 'ssr'`.
    */
   ssr?: boolean;
@@ -26,6 +34,11 @@ export interface AuthticsConfig {
 }
 
 export function defineConfig(config: AuthticsConfig): AuthticsConfig {
+  if (config.buildStyle == undefined) config.buildStyle = 'default';
+  if (config.buildStyle !== 'default' && config.buildStyle !== 'super') {
+    throw new Error('[HostJS] Invalid buildStyle. Expected "default" or "super".');
+  }
+
   if (config.autoPage == undefined) config.autoPage = true;
   if (config.autoFile == undefined) config.autoFile = true;
   if (config.showError == undefined)
@@ -50,6 +63,6 @@ export function defineConfig(config: AuthticsConfig): AuthticsConfig {
     config.devMode = true
   if (config.hasPausedRoute == undefined)
     config.hasPausedRoute = false
-  
+
   return config;
 }
