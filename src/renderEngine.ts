@@ -661,7 +661,7 @@ export async function renderPage(
     }
   }
 
-  if (clientCode === undefined || (!serverCode && !serverCodeDisabled)) {
+  if (clientCode === undefined || (clientCode === "" && renderMode !== "srtws") || (!serverCode && !serverCodeDisabled)) {
     //console.log(`[authtics] building bundle (${compiler}) for ${path.basename(tsxPath)}...`);
 
     const virtualServer = `
