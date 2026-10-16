@@ -151,6 +151,7 @@ bash.bash
 commit.sh
 .bashrc
 publish.sh
+pull.sh
 strip.js
 
 .replit
