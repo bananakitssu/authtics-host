@@ -144,7 +144,7 @@ The setting is opt-in, so projects that do not specify it continue using `defaul
 
 HostJS supports two ways to trigger page bundle compilation using `buildTrigger` in `authtics_host.config.ts`.
 
-- `default` (the default) compiles a TSX page when the first request needs it.
+- `default` (the default) compiles a TSX page on demand when a request needs it.
 - `prebuilt` compiles discoverable TSX pages during Authtics Host startup, before the HTTP server begins listening. Startup reports a prebuild error instead of opening the server if a page cannot be built.
 
 Prebuilt mode scans the configured auto-page directory for TSX pages and also prebuilds a registered `app.registerApp(...)` entry when it points to an existing TSX file. API handlers and static files are not TSX renderer bundles, so they are not prebuilt by this option. The renderer reuses generated caches in both `default` and `super` build styles.
