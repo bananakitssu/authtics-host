@@ -7,7 +7,7 @@ import fs from "node:fs";
 import url from "node:url";
 import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer } from "./renderEngine.js";
 import { setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
-import { initializeSuperBuildOutput } from "./superBuildOutput.js";
+import { initializeSuperBuildOutput, refreshSuperRouteManifest } from "./superBuildOutput.js";
 import type { BuildStyle } from "./config.js";
 //import tls from 'tls';
 let config_: any = {};
@@ -1311,7 +1311,16 @@ if (typeof handler === 'string') {
   if (fs.existsSync(_404Built)) watchSet.add(_404Built);
 
     for (const dir of watchSet) {
-    safeWatch(dir, notifyHmrClients);
+    safeWatch(dir, () => {
+      if (buildStyle === "super") {
+        try {
+          refreshSuperRouteManifest(process.cwd(), config, pagesDir, publicDir);
+        } catch (error) {
+          console.error("[HostJS] Failed to refresh Super route manifest:", error);
+        }
+      }
+      notifyHmrClients();
+    });
   }
   }
 
