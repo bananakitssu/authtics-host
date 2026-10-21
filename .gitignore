@@ -158,3 +158,5 @@ strip.js
 
 # HostJS Super build output
 .hostjs/
+.authtics_host/
+!svg_assets

@@ -2552,7 +2552,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               Renderer Type
             </span>
             <span style={{ fontSize: '12px', color: 'blue' }}>
-              {renderType === "ssr" ? 'SSR (Server-Side Rendering)' : renderType === "csr" ? 'CSR (Client-Side Rendering)' : renderType === "ssg" ? 'SSG (Static Site Generation)' : '???'}
+              {renderType === "ssr" ? 'SSR (Server-Side Rendering)' : renderType === "csr" ? 'CSR (Client-Side Rendering)' : renderType === "ssg" ? 'SSG (Static Site Generation)' : renderType === "srtws" ? "SRTWS (Site Rendering Through WebSockets)" : '???'}
             </span>
           </div>
           <div style={{
@@ -2903,6 +2903,33 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           <Sparkline data={heapUsageHistory} color="#3b82f6" label="Heap Used" unit={heapResult} />
         </div>
       </>
+    ) : packageSecurityOpen && !shutdown ? (
+      <>
+        <div style={{
+          padding: '6px 8px',
+          borderBottom: '1px solid #ddd',
+          background: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+        }}>
+          <PanelButton onClick={() => setPackageSecurityOpen(false)} style={{ color: '#555' }}>
+            <ArrowLeft size={12} /> Back
+          </PanelButton>
+          <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
+            <Shield size={12} color="#f472b6" /> Package Security
+          </span>
+        </div>
+        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: /*(datRestrictionMissing ? 'none' : 'flex')*/'flex', flexDirection: 'column', gap: '8px' }}>
+            <ShieldCheck size={36} color="#f472b6" style={{ flexShrink: 0, marginTop: '20px' }} />
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#333', fontSize: 26, fontWeight: 'bold' }}>
+              This feature is currently in BETA.
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#333', fontSize: 13 }}>
+              The newest version of Authtics Host may have this feature completely implemented.
+            </span>
+        </div>
+      </>
     ) : settingsOpen && !shutdown ? (
       <>
         <div style={{
@@ -2920,7 +2947,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <Cog size={12} color="#f472b6" /> Settings
           </span>
         </div>
-        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>
+        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: /*(datRestrictionMissing ? 'none' : 'flex')*/'flex', flexDirection: 'column', gap: '8px' }}>
           <PanelButton onClick={() => setPanelCustomOpen(true)} fullWidth style={{ color: '#333', justifyContent: 'space-between', height: '32px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Cog size={12} color="#3b82f6" /> Panel Customization

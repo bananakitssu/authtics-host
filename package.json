@@ -47,7 +47,6 @@
   "author": "bananacool467",
   "license": "MIT",
   "dependencies": {
-    "@bananacool467/ui-tools": "^0.2.2-beta",
     "@jridgewell/trace-mapping": "^0.3.31",
     "esbuild": "^0.28.2",
     "jiti": "^2.6.1",
@@ -60,6 +59,7 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@bananacool467/ui-tools": "^0.2.2-beta",
     "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.29.0",
     "@babel/preset-react": "^7.28.5",

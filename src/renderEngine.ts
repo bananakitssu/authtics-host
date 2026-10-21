@@ -1,7 +1,7 @@
 // src/renderEngine.ts
 import path from "node:path";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 //import { createRequire } from "node:module";
 import * as esbuild from "esbuild";
 //import * as babel from "@babel/core";
@@ -414,13 +414,63 @@ function resolveTemplate(appDir?: string, autoPageDir?: string, autoPaging?: boo
   return nextToCli;
 }
 
-export function handleHTML(
+let htmlPanelBundleCache:
+  | {
+      path: string;
+      mtimeMs: number;
+      bundle: Promise<string>;
+    }
+  | undefined;
+
+async function getHtmlPanelClientBundle(): Promise<string> {
+  if (!devPanelPath) {
+    throw new Error("[HostJS] DevPanel is not available.");
+  }
+
+  const mtimeMs = fs.statSync(devPanelPath).mtimeMs;
+
+  if (
+    htmlPanelBundleCache?.path === devPanelPath &&
+    htmlPanelBundleCache.mtimeMs === mtimeMs
+  ) {
+    return htmlPanelBundleCache.bundle;
+  }
+
+  const clientEntry = `
+    import React from "react";
+    import { hydrateRoot } from "react-dom/client";
+    import DevPanel from ${JSON.stringify(devPanelPath)};
+
+    const panelRoot = document.getElementById("authtics-dev-panel-root");
+    if (panelRoot) {
+      hydrateRoot(panelRoot, React.createElement(DevPanel));
+    }
+  `;
+
+  const bundle = buildWithEsbuild(
+    clientEntry,
+    path.dirname(devPanelPath),
+    "browser",
+    false,
+    { sourceMaps: false, minify: true }
+  );
+
+  htmlPanelBundleCache = {
+    path: devPanelPath,
+    mtimeMs,
+    bundle,
+  };
+
+  return bundle;
+}
+
+export async function handleHTML(
   rawHtml: string,
   actuallyShowPanel: boolean,
-  configDAT: string,
-  userDAT: string,
-  hotReload: boolean
-) {
+  configDAT?: string | string[],
+  userDAT?: string,
+  hotReload = false
+): Promise<string> {
   const datMatches =
     configDAT === undefined ||
     configDAT === userDAT ||
@@ -431,30 +481,57 @@ export function handleHTML(
     devPanelPath !== null &&
     datMatches;
 
-  const datRestricted = configDAT !== undefined;
+  const configScript =
+    `<script>window.__authtics_config__=` +
+    JSON.stringify({
+      datRestricted: configDAT !== undefined,
+      devMode: usesDevPanel,
+    }) +
+    `;</script>`;
 
-  const devMode = usesDevPanel;
+  let panelContainer = "";
+  let panelClientScript = "";
 
-  const configScript = `<script>window.__authtics_config__={datRestricted:${datRestricted ? 'true' : 'false'},devMode:${devMode !== false ? 'true' : 'false'}};</script>`;
-  const hmrScript = hotReload ? HMR_SCRIPT : '';
-  let devPanelContainer = usesDevPanel
-    ? `<div id="authtics-dev-panel-root"></div>`
-    : "";
-    const serverCjsPath = serverBundleForTsx(tsxPath, cacheVariant, tempPath);
-  const absoluteServerPath = path.resolve(serverCjsPath);
+  if (usesDevPanel && devPanelPath) {
+    const panelModule = await import(pathToFileURL(devPanelPath).href);
+    const Panel = (
+      panelModule.default ?? panelModule.DevPanel
+    ) as React.ComponentType;
 
-    const serverModule = customRequire(absoluteServerPath);
-    const exports = serverModule.__esModule ? serverModule.default : serverModule;
-    const DevPanelComponent = usesDevPanel ? (exports.DevPanel ?? null) : null;
+    const panelHtml = renderToString(
+      React.createElement(Panel)
+    );
 
-  let newHTML;
-  if ( rawHtml.includes("</body>") ) {
-    newHTML = rawHtml.replace("</body>", `${devPanelContainer}
-${configScript}
-${hmrScript}`);
+    panelContainer =
+      `<div id="authtics-dev-panel-root">${panelHtml}</div>`;
+
+    const clientCode = await getHtmlPanelClientBundle();
+
+    // Prevent bundle text from accidentally closing the inline script tag.
+    const safeClientCode = clientCode.replace(
+      /<\/script/gi,
+      "<\\/script"
+    );
+
+    panelClientScript = `<script>${safeClientCode}</script>`;
   }
 
-  return newHTML;
+  const injection = [
+    panelContainer,
+    configScript,
+    panelClientScript,
+    hotReload ? HMR_SCRIPT : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const bodyClose = /<\/body\s*>/i;
+
+  if (bodyClose.test(rawHtml)) {
+    return rawHtml.replace(bodyClose, `${injection}\n$&`);
+  }
+
+  return `${rawHtml}\n${injection}`;
 }
 
 function buildHtml(opts: {

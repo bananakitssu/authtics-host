@@ -2,11 +2,12 @@
 
 import { createServer, IncomingMessage, ServerResponse, Server } from "node:http";
 import { createJiti } from "jiti";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
 import url from "node:url";
 import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer, handleHTML } from "./renderEngine.js";
-import { setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
+import { getBuildOutputRoot, setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
 import { initializeSuperBuildOutput, refreshSuperRouteManifest } from "./superBuildOutput.js";
 import type { BuildStyle } from "./config.js";
 //import tls from 'tls';
@@ -36,6 +37,257 @@ const __dirname = path.dirname(__filename);
 
 // SSE clients waiting for hot reload signals
 const hmrClients = new Set<ServerResponse>();
+
+const DAT_GUESS_WINDOW_MS = 30 * 60 * 1000;
+const DAT_DISTINCT_GUESS_LIMIT = 5;
+const DAT_IP_BLOCK_MS = 24 * 60 * 60 * 1000;
+const ACTION_RATE_WINDOW_MS = 60 * 1000;
+
+type ActionRateRule = {
+  maxRequests: number;
+  windowMs: number;
+  bucket: "pause" | "lifecycle";
+};
+
+const ACTION_RATE_RULES: Record<string, ActionRateRule> = {
+  "/__authtics_host_apis__/set-users-paused": {
+    maxRequests: 5,
+    windowMs: ACTION_RATE_WINDOW_MS,
+    bucket: "pause",
+  },
+  "/__authtics_host_apis__/restart": {
+    maxRequests: 1,
+    windowMs: ACTION_RATE_WINDOW_MS,
+    bucket: "lifecycle",
+  },
+  "/__authtics_host_apis__/shutdown": {
+    maxRequests: 1,
+    windowMs: ACTION_RATE_WINDOW_MS,
+    bucket: "lifecycle",
+  },
+};
+
+const failedDatGuesses = new Map<string, Map<string, number>>();
+const blockedDatIps = new Map<string, number>();
+const actionRequestTimes = new Map<string, number[]>();
+let datLockoutFile = "";
+let lastDatSecurityCleanupAt = 0;
+
+function fingerprint(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function clientIpForRateLimit(req: IncomingMessage): string {
+  return (req.ip || req.socket.remoteAddress || "unknown").trim();
+}
+
+function persistDatLockouts(): void {
+  if (!datLockoutFile) return;
+
+  try {
+    fs.mkdirSync(path.dirname(datLockoutFile), { recursive: true });
+    const temporaryPath = `${datLockoutFile}.${process.pid}.tmp`;
+    fs.writeFileSync(
+      temporaryPath,
+      JSON.stringify(Object.fromEntries(blockedDatIps)),
+      { encoding: "utf8", mode: 0o600 },
+    );
+    try {
+      fs.chmodSync(temporaryPath, 0o600);
+    } catch {
+      // File permissions are best-effort on platforms that don't support POSIX modes.
+    }
+    fs.renameSync(temporaryPath, datLockoutFile);
+  } catch (error) {
+    console.error("[HostJS] Could not persist DAT lockouts:", error);
+  }
+}
+
+function loadDatLockouts(): void {
+  if (!datLockoutFile) return;
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(datLockoutFile, "utf8")) as Record<string, unknown>;
+    const now = Date.now();
+
+    for (const [ipHash, until] of Object.entries(parsed)) {
+      if (typeof until === "number" && until > now) {
+        blockedDatIps.set(ipHash, until);
+      }
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn("[HostJS] Could not read DAT lockouts; starting with an empty lockout list.");
+    }
+  }
+}
+
+function cleanupDatSecurityState(now: number): void {
+  if (now - lastDatSecurityCleanupAt < 60_000) return;
+  lastDatSecurityCleanupAt = now;
+
+  for (const [ipHash, guesses] of failedDatGuesses) {
+    for (const [candidateHash, timestamp] of guesses) {
+      if (now - timestamp >= DAT_GUESS_WINDOW_MS) guesses.delete(candidateHash);
+    }
+    if (guesses.size === 0) failedDatGuesses.delete(ipHash);
+  }
+
+  for (const [key, timestamps] of actionRequestTimes) {
+    const recent = timestamps.filter(timestamp => now - timestamp < ACTION_RATE_WINDOW_MS);
+    if (recent.length === 0) actionRequestTimes.delete(key);
+    else actionRequestTimes.set(key, recent);
+  }
+
+  let removedExpiredLockout = false;
+  for (const [ipHash, until] of blockedDatIps) {
+    if (until <= now) {
+      blockedDatIps.delete(ipHash);
+      removedExpiredLockout = true;
+    }
+  }
+  if (removedExpiredLockout) persistDatLockouts();
+}
+
+function sendDatGuardResponse(
+  res: ServerResponse,
+  statusCode: number,
+  code: string,
+  message: string,
+  retryAfterSeconds?: number,
+): void {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+  };
+  if (retryAfterSeconds !== undefined) {
+    headers["Retry-After"] = String(retryAfterSeconds);
+  }
+  res.writeHead(statusCode, headers);
+  res.end(JSON.stringify({ error: code, message, retryAfter: retryAfterSeconds }));
+}
+
+function recordInvalidDatGuess(ipHash: string, suppliedDat: string, now: number): boolean {
+  let guesses = failedDatGuesses.get(ipHash);
+  if (!guesses) {
+    guesses = new Map<string, number>();
+    failedDatGuesses.set(ipHash, guesses);
+  }
+
+  for (const [candidateHash, timestamp] of guesses) {
+    if (now - timestamp >= DAT_GUESS_WINDOW_MS) guesses.delete(candidateHash);
+  }
+
+  guesses.set(fingerprint(suppliedDat), now);
+
+  if (guesses.size >= DAT_DISTINCT_GUESS_LIMIT) {
+    blockedDatIps.set(ipHash, now + DAT_IP_BLOCK_MS);
+    failedDatGuesses.delete(ipHash);
+    persistDatLockouts();
+    return true;
+  }
+
+  return false;
+}
+
+function checkActionRateLimit(
+  ipHash: string,
+  pathname: string,
+  now: number,
+): number | undefined {
+  const rule = ACTION_RATE_RULES[pathname];
+  if (!rule) return undefined;
+
+  // Restart and shutdown share a bucket so alternating between them can't bypass the limit.
+  const key = `${ipHash}:${rule.bucket}`;
+  const recent = (actionRequestTimes.get(key) ?? [])
+    .filter(timestamp => now - timestamp < rule.windowMs);
+
+  if (recent.length >= rule.maxRequests) {
+    actionRequestTimes.set(key, recent);
+    return Math.max(1, Math.ceil((recent[0] + rule.windowMs - now) / 1000));
+  }
+
+  recent.push(now);
+  actionRequestTimes.set(key, recent);
+  return undefined;
+}
+
+function guardDatApiRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string,
+): boolean {
+  const now = Date.now();
+  cleanupDatSecurityState(now);
+  const ipHash = fingerprint(clientIpForRateLimit(req));
+  const blockedUntil = blockedDatIps.get(ipHash);
+
+  if (blockedUntil !== undefined) {
+    if (blockedUntil > now) {
+      sendDatGuardResponse(
+        res,
+        429,
+        "DAT_IP_BLOCKED",
+        "DAT-protected endpoints are temporarily unavailable from this IP.",
+        Math.ceil((blockedUntil - now) / 1000),
+      );
+      return false;
+    }
+    blockedDatIps.delete(ipHash);
+    persistDatLockouts();
+  }
+
+  const configuredDats: string[] =
+    typeof config_.dat === "string"
+      ? [config_.dat]
+      : Array.isArray(config_.dat)
+        ? config_.dat.filter((value: unknown): value is string => typeof value === "string")
+        : [];
+  const datRestrictionEnabled = config_.dat !== undefined && config_.dat !== null;
+  const datMatches =
+    !datRestrictionEnabled ||
+    configuredDats.includes(req.dat ?? "");
+
+  if (datRestrictionEnabled && !datMatches) {
+    const justBlocked = recordInvalidDatGuess(
+      ipHash,
+      req.dat ?? "<missing>",
+      now,
+    );
+
+    if (justBlocked) {
+      sendDatGuardResponse(
+        res,
+        429,
+        "DAT_IP_BLOCKED",
+        "Too many distinct invalid DAT values. DAT-protected endpoints are blocked for 24 hours.",
+        Math.ceil(DAT_IP_BLOCK_MS / 1000),
+      );
+    } else {
+      sendDatGuardResponse(res, 401, "INVALID_DAT", "DAT authorization failed.");
+    }
+    return false;
+  }
+
+  if (datRestrictionEnabled) {
+    failedDatGuesses.delete(ipHash);
+  }
+
+  const retryAfter = checkActionRateLimit(ipHash, pathname, now);
+  if (retryAfter !== undefined) {
+    sendDatGuardResponse(
+      res,
+      429,
+      "ACTION_RATE_LIMITED",
+      "This action is temporarily rate-limited. Try again later.",
+      retryAfter,
+    );
+    return false;
+  }
+
+  return true;
+}
 
 function safeWatch(target: string, onChange: () => void): void {
   const shouldReact = (filename: string | null): boolean => {
@@ -674,6 +926,8 @@ async function start() {
   }
   const buildStyle: BuildStyle = requestedBuildStyle;
   setBuildStyle(buildStyle, process.cwd());
+  datLockoutFile = path.join(getBuildOutputRoot(), "security", "dat-lockouts.json");
+  loadDatLockouts();
 
   const PORT = config.port ?? 3000;
   const renderType = config.renderType ?? 'ssr';
@@ -881,6 +1135,15 @@ if (ua.includes("Windows NT")) {
 
     // ── 1. Registered routes (from app.get/post/etc.) ──────────────────────
     const routeKey = `${method}:${pathname}`;
+    if (
+      pathname.startsWith("/__authtics_host_apis__/") &&
+      routes.has(routeKey) &&
+      typeof routes.get(routeKey) === "function" &&
+      !guardDatApiRequest(req, res, pathname)
+    ) {
+      return;
+    }
+
     if (routes.has(routeKey)) {
       if (Array.isArray(config_.dat) && !config_.dat.includes(req.dat) && usersPaused && !routeKey.endsWith('.js')) {
         if (autoPaging) {
@@ -1234,8 +1497,16 @@ if (typeof handler === 'string') {
 
     // ── 6. Static HTML pages ────────────────────────────────────────────────
     if (htmlPath && fs.existsSync(htmlPath)) {
-      res.setHeader("Content-Type", "text/html");
-      return res.end(handleHTML(fs.readFileSync(htmlPath, "utf-8"), actuallyShowPanel));
+  const html = await handleHTML(
+    fs.readFileSync(htmlPath, "utf-8"),
+    actuallyShowPanel,
+    config_.dat,
+    req.cookies.dat,
+    hotReload
+  );
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  return res.end(html);
     }
 
     // ── 7. App.tsx file handling ──────────────────────────────────────────────────────────────
