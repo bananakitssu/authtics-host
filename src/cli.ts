@@ -5,7 +5,7 @@ import { createJiti } from "jiti";
 import path from "node:path";
 import fs from "node:fs";
 import url from "node:url";
-import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer } from "./renderEngine.js";
+import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer, handleHTML } from "./renderEngine.js";
 import { setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
 import { initializeSuperBuildOutput, refreshSuperRouteManifest } from "./superBuildOutput.js";
 import type { BuildStyle } from "./config.js";
@@ -1235,7 +1235,7 @@ if (typeof handler === 'string') {
     // ── 6. Static HTML pages ────────────────────────────────────────────────
     if (htmlPath && fs.existsSync(htmlPath)) {
       res.setHeader("Content-Type", "text/html");
-      return res.end(fs.readFileSync(htmlPath, "utf-8"));
+      return res.end(handleHTML(fs.readFileSync(htmlPath, "utf-8"), actuallyShowPanel));
     }
 
     // ── 7. App.tsx file handling ──────────────────────────────────────────────────────────────

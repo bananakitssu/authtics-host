@@ -414,6 +414,49 @@ function resolveTemplate(appDir?: string, autoPageDir?: string, autoPaging?: boo
   return nextToCli;
 }
 
+export function handleHTML(
+  rawHtml: string,
+  actuallyShowPanel: boolean,
+  configDAT: string,
+  userDAT: string,
+  hotReload: boolean
+) {
+  const datMatches =
+    configDAT === undefined ||
+    configDAT === userDAT ||
+    (Array.isArray(configDAT) && configDAT.includes(userDAT ?? ""));
+
+  const usesDevPanel =
+    actuallyShowPanel &&
+    devPanelPath !== null &&
+    datMatches;
+
+  const datRestricted = configDAT !== undefined;
+
+  const devMode = usesDevPanel;
+
+  const configScript = `<script>window.__authtics_config__={datRestricted:${datRestricted ? 'true' : 'false'},devMode:${devMode !== false ? 'true' : 'false'}};</script>`;
+  const hmrScript = hotReload ? HMR_SCRIPT : '';
+  let devPanelContainer = usesDevPanel
+    ? `<div id="authtics-dev-panel-root"></div>`
+    : "";
+    const serverCjsPath = serverBundleForTsx(tsxPath, cacheVariant, tempPath);
+  const absoluteServerPath = path.resolve(serverCjsPath);
+
+    const serverModule = customRequire(absoluteServerPath);
+    const exports = serverModule.__esModule ? serverModule.default : serverModule;
+    const DevPanelComponent = usesDevPanel ? (exports.DevPanel ?? null) : null;
+
+  let newHTML;
+  if ( rawHtml.includes("</body>") ) {
+    newHTML = rawHtml.replace("</body>", `${devPanelContainer}
+${configScript}
+${hmrScript}`);
+  }
+
+  return newHTML;
+}
+
 function buildHtml(opts: {
   pageHtml: string;
   clientCode: string;
