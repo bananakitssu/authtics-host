@@ -6,13 +6,9 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
 import url from "node:url";
-<<<<<<< HEAD
 import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer, handleHTML } from "./renderEngine.js";
 import { getBuildOutputRoot, setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
-=======
-import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer } from "./renderEngine.js";
-import { setBuildStyle, setBuildTrigger, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
->>>>>>> c8343f6a0460e59db5f5d513d08ccf5eb365de05
+import { setBuildTrigger } from "./rendererTempFiles.js";
 import { initializeSuperBuildOutput, refreshSuperRouteManifest } from "./superBuildOutput.js";
 import type { BuildStyle, BuildTrigger } from "./config.js";
 //import tls from 'tls';
