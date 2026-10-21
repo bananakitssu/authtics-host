@@ -1,6 +1,6 @@
 # Authtics Host
 
-Version 0.2.6, License: MIT
+Version 0.2.7, License: MIT
 
 Authtics Host is a web framework inspired by Next.js. Authtics Host supports SSR (Server-Side Rendering), SSG (Static Site Generation), CSR (Client-Side Rendering) and SRTWS (Site Rendering Through WebSockets) and uses **Esbuild**. This is not to be confused with auth platforms.
 
@@ -299,14 +299,41 @@ app.use((req, res, id, next) => {
 
 The 3rd USE event will never run because the 2nd USE event didnt use `next()`.
 
+## SRTWS
+
+SRTWS is **Site Rendering Through WebSockets**, its currently in BETA.
+
+When a client visits your site if renderer is set to SRTWS, a **SRTWS server** starts and the client connects to it. Then, the **SRTWS server** sends the entire compiled TSX to the client.
+
 ## REQuest APIs
 
 The `req` variable (like used in `app.get`) is an extension of the ***Node.js HTTP IncomingMessage*** class, the added items in `req` are:
 
 * **dat** (`req.dat`) — The user's DAT cookie for the current App.
 * **cookies** (`req.cookies`) — All the extracted user's cookies for the current App.
-* **body** (`req.body` for POST) — The parsed `body` that was sent from client
-* 
+* **body** (`req.body` for POST) — The parsed `body` that was sent from client.
+* **ip** (`req.ip`) — The request's IP.
+* **ipType** (`req.ipType`) — The IP's type as a number, 6 is IPv6, 4 is IPv4, 0 is unknown.
+* **ua** (`req.ua`) — The request's UserAgent.
+* **os** (`req.os`) — The request's OS from the UserAgent.
+* **browser** (`req.browser`) — The request's browser from the UserAgent.
+* **sentTime** (`req.sentTim.e`) — When the request was sent
+* **bodySize** (`req.bodySize` for POST) — The size of the body. (`req.body`)
+* **bodyType** (`req.bodyType`) — The Content-Type of the body. (`req.body`)
+
+## RESponse APIs
+
+The `res` variable (like used in `app.get`) is an extension of the ***Node.js HTTP ServerResponse*** class, the added items in `res` are:
+
+* **redirect** (`res.redirect(url)`) — Send the client to another URL.
+* **html** (`res.html(content)`) — Return HTML to the client.
+* **json** (`res.json(content)`) — Return JSON to the client.
+* **text** (`res.text(content)`) — Return plain text to the client.
+* **file** (`res.file(path)`) — Let HostJS read the provided file path and return the file content to the client.
+* **status** (`res.status(code)`) — Change the server's status code, returns new **ServerResponse** object.
+* **reload** (`res.reload()`) — Send a reload request to the client.
+* **setCookie** (`res.setCookie(name, value)`) — Set a cookie on the client.
+* **rmvCookie** (`res.rmvCookie(name)`) — Remove a cookie from the client.
 
 ## Notes about Authtics Host
 
