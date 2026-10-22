@@ -1794,7 +1794,7 @@ setHostName(window.location.hostname);
             <ShieldCheck size={16} color="#f472b6" style={{ flexShrink: 0 }} /> Authtics Host
           </div>
           <p style={{ color: 'red', fontSize: '12px' }}>Error found ({selectedError}/{errors.length})</p>
-          <PanelButton onClick={() => { setErrorBoxOpen(false); sleepErrorNotifications() }} style={{ marginLeft: 'auto', }}>Close</PanelButton>
+          <PanelButton onClick={() => { setErrorBoxOpen(false); sleepErrorNotifications(); setErrors([]); setSelectedError(1) }} style={{ marginLeft: 'auto', }}>Close</PanelButton>
         </div>
         <div style={{
           padding: '6px 2px',

@@ -153,6 +153,7 @@ commit.sh
 publish.sh
 pull.sh
 strip.js
+.npmrc
 
 .replit
 
