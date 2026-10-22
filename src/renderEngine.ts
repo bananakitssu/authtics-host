@@ -245,6 +245,11 @@ const nodeStubPlugin: esbuild.Plugin = {
   return result.outputFiles[0].text;
 }*/
 
+type BuiltBundle = {
+  code: string;
+  map?: string;
+};
+
 async function buildWithEsbuild(
   virtualContent: string,
   resolveDir: string,
@@ -615,12 +620,10 @@ function isCacheValid(
   templatePath: string | null,
   devPanelPath: string | null,
   clientBundlePath?: string,
-  serverBundleRequired = true,
-  requiredArtifacts: string[] = []
+  serverBundleRequired = true
 ): boolean {
   if (!fs.existsSync(tempPath) || (serverBundleRequired && !fs.existsSync(serverCjsPath))) return false;
   if (clientBundlePath && !fs.existsSync(clientBundlePath)) return false;
-  if (requiredArtifacts.some((artifactPath) => !fs.existsSync(artifactPath))) return false;
   try {
     const cacheMtime = fs.statSync(tempPath).mtimeMs;
     // Page file changed?
@@ -775,29 +778,11 @@ export async function renderPage(
   const requiredClientBundlePath = separateClientBundle ? clientBundlePath : undefined;
   const serverCodeDisabled = renderMode === 'csr' || renderMode === 'srtws';
   const clientJsUrl =
-    `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`;
-  const clientMapUrl = `${clientJsUrl}.map`;
-  const clientMapPath = `${clientBundlePath}.map`;
-  const serverMapPath = `${serverCjsPath}.map`;
-  const requiredMapArtifacts =
-    enableDiagnostics && renderMode !== "srtws"
-      ? [clientMapPath, ...(!serverCodeDisabled ? [serverMapPath] : [])]
-      : [];
+  `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`;
+const clientMapUrl = `${clientJsUrl}.map`;
 
   // Fast-path: Return cached static HTML if SSG mode is active and valid
-  if (
-    renderMode === 'ssg' &&
-    isCacheValid(
-      tsxPath,
-      ssgHtmlPath,
-      serverCjsPath,
-      templatePath,
-      devPanelPath,
-      requiredClientBundlePath,
-      !serverCodeDisabled,
-      requiredMapArtifacts
-    )
-  ) {
+  if (renderMode === 'ssg' && isCacheValid(tsxPath, ssgHtmlPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath)) {
     try {
       return fs.readFileSync(ssgHtmlPath, "utf-8");
     } catch {
@@ -806,24 +791,10 @@ export async function renderPage(
   }
 
   let clientCode: string | undefined;
-  let clientMap: string | undefined;
   let serverCode: string | undefined;
-  let serverMap: string | undefined;
   let freshWrite = false;
 
-  if (
-    isCacheValid(
-      tsxPath,
-      tempPath,
-      serverCjsPath,
-      templatePath,
-      devPanelPath,
-      requiredClientBundlePath,
-      !serverCodeDisabled,
-      requiredMapArtifacts
-    ) &&
-    (autoPaging || getBuildTrigger() === "prebuilt")
-  ) {
+  if (isCacheValid(tsxPath, tempPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath, !serverCodeDisabled) && (autoPaging || getBuildTrigger() === "prebuilt")) {
     try {
       const parsed = JSON.parse(readTempFile(tempPath));
       if (separateClientBundle) {
@@ -833,9 +804,6 @@ export async function renderPage(
           : undefined;
       } else {
         clientCode = parsed.clientCode;
-      }
-      if (enableDiagnostics && renderMode !== "srtws") {
-        clientMap = fs.readFileSync(clientMapPath, "utf-8");
       }
       serverCode = serverCodeDisabled ? undefined : fs.readFileSync(serverCjsPath, "utf-8");
       //console.log(`[authtics] using cached bundle for ${path.basename(tsxPath)}`);
@@ -892,31 +860,16 @@ export async function renderPage(
       clientCode = await buildWithBabel(tsxPath, virtualClient, 'browser');
     } else {*/
     if (compiler === 'esbuild') {
-      if (!serverCodeDisabled) {
-        const builtServer = await buildWithEsbuild(
-          virtualServer,
-          process.cwd(),
-          'node',
-          patchForServer,
-          {
-            sourceMaps: enableDiagnostics,
-            minify: !enableDiagnostics,
-            outfile: serverCjsPath,
-            sourceMapUrl: path.basename(serverMapPath),
-          }
-        );
-        serverCode = builtServer.code;
-        serverMap = builtServer.map;
-      }
+      if (!serverCodeDisabled) serverCode = await buildWithEsbuild(virtualServer, process.cwd(), 'node', patchForServer, { sourceMaps: enableDiagnostics, minify: !enableDiagnostics });
       if (renderMode !== 'srtws') {
         const built = await buildWithEsbuild(virtualClient, process.cwd(), 'browser', patchForServer, {
-          sourceMaps: enableDiagnostics,
-          minify: !enableDiagnostics,
-          outfile: clientBundlePath,
-          sourceMapUrl: clientMapUrl,
-        });
-        clientCode = built.code;
-        clientMap = built.map;
+  sourceMaps: enableDiagnostics,
+  minify: !enableDiagnostics,
+  outfile: clientOutfile,
+  sourceMapUrl: clientMapUrl,
+});
+clientCode = built.code;
+clientMap = built.map;
       } else {
         clientCode = "";
       }
@@ -926,8 +879,6 @@ export async function renderPage(
     writeTempFile(tempPath, JSON.stringify({ clientCode }));
     freshWrite = true;*/
     if (serverCode) await fs.promises.writeFile(serverCjsPath, serverCode, "utf-8");
-    if (serverMap) await fs.promises.writeFile(serverMapPath, serverMap, "utf-8");
-    if (clientMap) await fs.promises.writeFile(clientMapPath, clientMap, "utf-8");
     if (separateClientBundle) {
       await fs.promises.writeFile(clientBundlePath, clientCode ?? "", "utf-8");
       writeTempFile(tempPath, JSON.stringify({
@@ -941,8 +892,10 @@ export async function renderPage(
   }
 
   //fileHandler ? fileHandler(clientCode || "", `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`) : null;
-  if (clientCode !== undefined) fileHandler?.(clientCode, clientJsUrl);
-  if (clientMap !== undefined) fileHandler?.(clientMap, clientMapUrl);
+  fileHandler?.(clientCode, clientJsUrl);
+if (clientMap) {
+  fileHandler?.(clientMap, clientMapUrl);
+}
 
   // The prebuilt trigger compiles bundles at startup without invoking an SSR
   // page component. SSG is the exception because it must emit static HTML.
