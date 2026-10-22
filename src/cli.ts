@@ -1212,6 +1212,19 @@ if (ua.includes("Windows NT")) {
         }))
       }
       const handler = routes.get(routeKey);
+      if (typeof handler === "function" && routeKey.toLowerCase().endsWith(".map")) {
+        const configuredDAT = config_.dat;
+        const hasMatchingDAT =
+          configuredDAT === undefined ||
+          (Array.isArray(configuredDAT)
+            ? configuredDAT.includes(req.dat ?? "")
+            : configuredDAT === req.dat);
+
+        if (!hasMatchingDAT) {
+          res.writeHead(404);
+          return res.end();
+        }
+      }
 if (typeof handler === 'string') {
   return;
 } else if (typeof handler === 'function') {

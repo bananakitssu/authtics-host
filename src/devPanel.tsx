@@ -29,41 +29,50 @@ async function mapGeneratedLocation(
 
     const generatedCode = await response.text();
 
-    const sourceMapMarker =
-  "sourceMappingURL=data:application/json";
+    const sourceMapReference = generatedCode.match(
+      /\/\/[#@]\s*sourceMappingURL=([^\s]+)/
+    )?.[1];
 
-const markerIndex = generatedCode.lastIndexOf(sourceMapMarker);
+    if (!sourceMapReference) {
+      console.warn("[HostJS] No source map URL found in", location.file);
+      return location;
+    }
 
-if (markerIndex === -1) {
-  console.warn(
-    "[HostJS] No inline source map found in",
-    location.file
-  );
+    let sourceMapJson: string;
 
-  return location;
-}
+    if (sourceMapReference.startsWith("data:")) {
+      const commaIndex = sourceMapReference.indexOf(",");
+      if (commaIndex === -1) return location;
 
-const sourceMapStart = generatedCode.indexOf(
-  ",",
-  markerIndex
-);
+      const metadata = sourceMapReference.slice(0, commaIndex);
+      const encodedMap = sourceMapReference.slice(commaIndex + 1);
 
-if (sourceMapStart === -1) {
-  return location;
-}
+      if (metadata.includes(";base64")) {
+        const binary = atob(encodedMap);
+        const bytes = Uint8Array.from(binary, (character) =>
+          character.charCodeAt(0)
+        );
+        sourceMapJson = new TextDecoder().decode(bytes);
+      } else {
+        sourceMapJson = decodeURIComponent(encodedMap);
+      }
+    } else {
+      const mapUrl = new URL(
+        sourceMapReference,
+        response.url || new URL(location.file, window.location.href).href
+      );
+      const mapResponse = await fetch(mapUrl, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
 
-const encodedMap = generatedCode
-  .slice(sourceMapStart + 1)
-  .trim()
-  .split(/\s+/)[0];
+      if (!mapResponse.ok) {
+        console.warn("[HostJS] Could not load source map:", mapUrl.href);
+        return location;
+      }
 
-let sourceMapJson: string;
-
-if (generatedCode.slice(markerIndex, sourceMapStart).includes(";base64")) {
-  sourceMapJson = atob(encodedMap);
-} else {
-  sourceMapJson = decodeURIComponent(encodedMap);
-}
+      sourceMapJson = await mapResponse.text();
+    }
 
 const sourceMap = JSON.parse(sourceMapJson);
 const traceMap = new TraceMap(sourceMap);

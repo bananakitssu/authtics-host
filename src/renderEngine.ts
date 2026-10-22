@@ -24,6 +24,10 @@ import {
 } from "./rendererTempFiles.js";
 import { createRequire } from "node:module";
 const customRequire = createRequire(import.meta.url);
+type BuiltBundle = {
+  code: string;
+  map?: string;
+};
 
 import { IncomingMessage } from "node:http";
 import type { Socket } from "node:net";
@@ -248,12 +252,17 @@ async function buildWithEsbuild(
   patchForServer = false,
   options: {
     sourceMaps?: boolean;
+    sourceMapUrl?: string;
+    outfile?: string;
     minify?: boolean;
   } = {}
-): Promise<string> {
+): Promise<BuiltBundle> {
   const toFwdSlash = (p: string) => p.split(path.sep).join('/');
   const isNode = platform === 'node';
   const sourceMaps = options.sourceMaps === true;
+  const outfile = path.resolve(
+    options.outfile ?? path.join(resolveDir, `virtual-entry-${platform}.js`)
+  );
 
   const result = await esbuild.build({
     stdin: {
@@ -263,11 +272,12 @@ async function buildWithEsbuild(
     },
     bundle: true,
     write: false,
+    outfile,
     format: isNode ? 'cjs' : 'iife',
     platform,
     jsx: 'automatic',
     target: isNode ? ['node18'] : ['es2020'],
-    sourcemap: sourceMaps ? "inline" : false,
+    sourcemap: sourceMaps ? "external" : false,
     sourcesContent: sourceMaps,
     minify: options.minify ?? !sourceMaps,
     treeShaking: true,
@@ -362,7 +372,20 @@ async function buildWithEsbuild(
          toFwdSlash(path.join(__dirname, 'rendererTempFiles.js'))],
   });
 
-  return result.outputFiles[0].text;
+  const jsFile = result.outputFiles.find(
+  (file) => path.resolve(file.path) === outfile
+);
+const mapFile = result.outputFiles.find(
+  (file) => path.resolve(file.path) === `${outfile}.map`
+);
+if (!jsFile) {
+  throw new Error(`esbuild did not produce ${outfile}`);
+}
+
+  const code = mapFile && options.sourceMapUrl
+    ? `${jsFile.text}\n//# sourceMappingURL=${options.sourceMapUrl}\n`
+    : jsFile.text;
+  return { code, map: mapFile?.text };
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +477,7 @@ async function getHtmlPanelClientBundle(): Promise<string> {
     "browser",
     false,
     { sourceMaps: false, minify: true }
-  );
+  ).then(({ code }) => code);
 
   htmlPanelBundleCache = {
     path: devPanelPath,
@@ -592,10 +615,12 @@ function isCacheValid(
   templatePath: string | null,
   devPanelPath: string | null,
   clientBundlePath?: string,
-  serverBundleRequired = true
+  serverBundleRequired = true,
+  requiredArtifacts: string[] = []
 ): boolean {
   if (!fs.existsSync(tempPath) || (serverBundleRequired && !fs.existsSync(serverCjsPath))) return false;
   if (clientBundlePath && !fs.existsSync(clientBundlePath)) return false;
+  if (requiredArtifacts.some((artifactPath) => !fs.existsSync(artifactPath))) return false;
   try {
     const cacheMtime = fs.statSync(tempPath).mtimeMs;
     // Page file changed?
@@ -749,9 +774,30 @@ export async function renderPage(
   const ssgHtmlPath = ssgHtmlForTsx(tsxPath, cacheVariant, tempPath);
   const requiredClientBundlePath = separateClientBundle ? clientBundlePath : undefined;
   const serverCodeDisabled = renderMode === 'csr' || renderMode === 'srtws';
+  const clientJsUrl =
+    `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`;
+  const clientMapUrl = `${clientJsUrl}.map`;
+  const clientMapPath = `${clientBundlePath}.map`;
+  const serverMapPath = `${serverCjsPath}.map`;
+  const requiredMapArtifacts =
+    enableDiagnostics && renderMode !== "srtws"
+      ? [clientMapPath, ...(!serverCodeDisabled ? [serverMapPath] : [])]
+      : [];
 
   // Fast-path: Return cached static HTML if SSG mode is active and valid
-  if (renderMode === 'ssg' && isCacheValid(tsxPath, ssgHtmlPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath)) {
+  if (
+    renderMode === 'ssg' &&
+    isCacheValid(
+      tsxPath,
+      ssgHtmlPath,
+      serverCjsPath,
+      templatePath,
+      devPanelPath,
+      requiredClientBundlePath,
+      !serverCodeDisabled,
+      requiredMapArtifacts
+    )
+  ) {
     try {
       return fs.readFileSync(ssgHtmlPath, "utf-8");
     } catch {
@@ -760,10 +806,24 @@ export async function renderPage(
   }
 
   let clientCode: string | undefined;
+  let clientMap: string | undefined;
   let serverCode: string | undefined;
+  let serverMap: string | undefined;
   let freshWrite = false;
 
-  if (isCacheValid(tsxPath, tempPath, serverCjsPath, templatePath, devPanelPath, requiredClientBundlePath, !serverCodeDisabled) && (autoPaging || getBuildTrigger() === "prebuilt")) {
+  if (
+    isCacheValid(
+      tsxPath,
+      tempPath,
+      serverCjsPath,
+      templatePath,
+      devPanelPath,
+      requiredClientBundlePath,
+      !serverCodeDisabled,
+      requiredMapArtifacts
+    ) &&
+    (autoPaging || getBuildTrigger() === "prebuilt")
+  ) {
     try {
       const parsed = JSON.parse(readTempFile(tempPath));
       if (separateClientBundle) {
@@ -773,6 +833,9 @@ export async function renderPage(
           : undefined;
       } else {
         clientCode = parsed.clientCode;
+      }
+      if (enableDiagnostics && renderMode !== "srtws") {
+        clientMap = fs.readFileSync(clientMapPath, "utf-8");
       }
       serverCode = serverCodeDisabled ? undefined : fs.readFileSync(serverCjsPath, "utf-8");
       //console.log(`[authtics] using cached bundle for ${path.basename(tsxPath)}`);
@@ -829,9 +892,31 @@ export async function renderPage(
       clientCode = await buildWithBabel(tsxPath, virtualClient, 'browser');
     } else {*/
     if (compiler === 'esbuild') {
-      if (!serverCodeDisabled) serverCode = await buildWithEsbuild(virtualServer, process.cwd(), 'node', patchForServer, { sourceMaps: enableDiagnostics, minify: !enableDiagnostics });
+      if (!serverCodeDisabled) {
+        const builtServer = await buildWithEsbuild(
+          virtualServer,
+          process.cwd(),
+          'node',
+          patchForServer,
+          {
+            sourceMaps: enableDiagnostics,
+            minify: !enableDiagnostics,
+            outfile: serverCjsPath,
+            sourceMapUrl: path.basename(serverMapPath),
+          }
+        );
+        serverCode = builtServer.code;
+        serverMap = builtServer.map;
+      }
       if (renderMode !== 'srtws') {
-        clientCode = await buildWithEsbuild(virtualClient, process.cwd(), 'browser', patchForServer, { sourceMaps: enableDiagnostics, minify: !enableDiagnostics });
+        const built = await buildWithEsbuild(virtualClient, process.cwd(), 'browser', patchForServer, {
+          sourceMaps: enableDiagnostics,
+          minify: !enableDiagnostics,
+          outfile: clientBundlePath,
+          sourceMapUrl: clientMapUrl,
+        });
+        clientCode = built.code;
+        clientMap = built.map;
       } else {
         clientCode = "";
       }
@@ -841,6 +926,8 @@ export async function renderPage(
     writeTempFile(tempPath, JSON.stringify({ clientCode }));
     freshWrite = true;*/
     if (serverCode) await fs.promises.writeFile(serverCjsPath, serverCode, "utf-8");
+    if (serverMap) await fs.promises.writeFile(serverMapPath, serverMap, "utf-8");
+    if (clientMap) await fs.promises.writeFile(clientMapPath, clientMap, "utf-8");
     if (separateClientBundle) {
       await fs.promises.writeFile(clientBundlePath, clientCode ?? "", "utf-8");
       writeTempFile(tempPath, JSON.stringify({
@@ -853,7 +940,9 @@ export async function renderPage(
     //console.log(`[authtics] bundle cached for ${path.basename(tsxPath)}`);
   }
 
-  fileHandler ? fileHandler(clientCode || "", `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`) : null;
+  //fileHandler ? fileHandler(clientCode || "", `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`) : null;
+  if (clientCode !== undefined) fileHandler?.(clientCode, clientJsUrl);
+  if (clientMap !== undefined) fileHandler?.(clientMap, clientMapUrl);
 
   // The prebuilt trigger compiles bundles at startup without invoking an SSR
   // page component. SSG is the exception because it must emit static HTML.
