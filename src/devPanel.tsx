@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, MouseEvent } from 'react';
+import React, { ReactNode, useState, useEffect, useRef, MouseEvent } from 'react';
 import { ShieldCheck, Shield, CircleX, ChevronDown, ChevronUp, Bug, AlertTriangle, Info, ArrowLeft, Wifi, Terminal, Route, Globe, ChevronRight, ChevronLeft, Server, Cog, /*Search,*/ TriangleAlert, Eye, Zap, Power, Check as Tick, CheckCircle2, EyeOff, Copy, CopyCheck } from 'lucide-react';
 import {
   TraceMap,
@@ -12,6 +12,100 @@ import 'prismjs/components/prism-javascript';
 //const isMobile = true;
 
 let pT: any, rT: any, sT: any;
+
+function Tab({
+  children
+}: {
+  children: ReactNode;
+}) { 
+  return <>{children}</>; 
+}
+
+function TabBody({
+  children
+}: {
+  children: ReactNode
+}) {
+  return (
+    <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display:  'flex', flexDirection: 'column', gap: '8px' }}>
+      {children}
+    </div>
+  )
+}
+
+function TabData({
+  title,
+  titleColor,
+  content,
+  contentColor
+}: {
+  title: string,
+  titleColor: React.CSSProperties['color'],
+  content: string,
+  contentColor:  React.CSSProperties['color']
+}) {
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      padding: '6px 10px',
+      background: '#fff',
+      borderRadius: '50px',
+      border: '1px solid #eee',
+      fontSize: '12px',
+      color: '#333',
+    }}>
+      <span style={{ fontSize: '12px', color: titleColor ?? '#333' }}>
+        {title}
+      </span>
+      <span style={{ fontSize: '12px', color: contentColor ?? 'blue' }}>
+        {content}
+      </span>
+    </div>
+  )
+}
+
+function TabHeader({
+  title,
+  icon,
+  onBack,
+  children
+} : {
+  title: string,
+  icon: any,
+  onBack: Function,
+  children?: ReactNode
+}) {
+  return (
+    <div style={{
+       padding: '6px 8px',
+      borderBottom: '1px solid #ddd',
+      background: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      margin: '10px',
+      borderRadius: '100px'
+      //justifyContent: 'space-between'
+    }}>
+      <div style={{
+      alignItems: 'center',
+      display: 'flex'
+      }}>
+      <PanelButton onClick={() => { onBack() }} style={{ color: '#555' }}>
+        <ArrowLeft size={12} />
+      </PanelButton>
+      <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
+        {icon} {title}
+      </span>
+      </div>
+      <div style={{
+      alignItems: 'center',
+        display: 'flex'
+      }}>{children}</div>
+    </div>
+  )
+}
 
 async function increaseDots(dots: number, setter: Function, type: number): Promise<number> {
   return new Promise((r) => {
@@ -746,11 +840,21 @@ function SecuredTab() {
 }
 
 function ShutdownTab() {
-  return (
+  /*return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', padding: '10px 10px', textAlign: 'center', gap: '8px' }}>
       <Power size={32} color='grey' />
       <span style={{ color: 'grey', fontSize: 24}}>The server was shutdown by you.</span>
     </div>
+  )*/
+  return (
+    <Tab>
+      <TabBody>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', padding: '10px 10px', textAlign: 'center', gap: '8px' }}>
+      <Power size={32} color='grey' />
+      <span style={{ color: 'grey', fontSize: 24}}>The server was shutdown by you.</span>
+    </div>
+      </TabBody>
+    </Tab>
   )
 }
 

@@ -588,6 +588,11 @@ export default class App {
         res.end(JSON.stringify({
           message: "ok"
         }))
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     })
     this.post('/__authtics_host_apis__/is-users-paused', async (req, res) => {
@@ -599,7 +604,12 @@ export default class App {
       if (datMatched) {res.end(JSON.stringify({
         paused: (datMatched ? false : usersPaused),
         realInfo: usersPaused
-      }))}
+      }))} else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
+      }
     })
     this.post('/__authtics_host_apis__/get-dat-restriction-missing', async (req, res) => {
       //const reqBody = (await getJsonBody(req)) as any;
@@ -614,6 +624,11 @@ export default class App {
         res.end(JSON.stringify({
           enabled: datRestrictedEnv
         }));
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     });
     this.post('/__authtics_host_apis__/get-dat-matching', async (req, res) => {
@@ -641,6 +656,11 @@ export default class App {
           heapUsed,
           heapTotal
         }))
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     })
     this.post('/__authtics_host_apis__/get-user-settings', async (req, res) => {
@@ -653,6 +673,11 @@ export default class App {
         res.end(JSON.stringify({
           showError: config_.showError !== undefined ? config_.showError : true
         }));
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     })
     this.post("/__authtics_host_apis__/get-server-info", async (req, res) => {
@@ -664,6 +689,11 @@ export default class App {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
           uptime, totalRequests, users
+        }))
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
         }))
       }
     })
@@ -685,6 +715,11 @@ export default class App {
         this.server?.close(() => {
           process.kill(process.pid, 'SIGTERM')
         })
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     })
     this.post("/__authtics_host_apis__/shutdown", async (req, res) => {
@@ -698,6 +733,11 @@ export default class App {
         this.server?.close(() => {
           process.kill(process.pid, 'SIGTERM');
         })
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     })
     this.post("/__authtics_host_apis__/get-render-type", async (req, res) => {
@@ -709,6 +749,11 @@ export default class App {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
           renderType: config_.renderType
+        }))
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
         }))
       }
     })
@@ -723,7 +768,12 @@ export default class App {
         res.end(JSON.stringify({
           compiler: config_.compilerType
         }))
-      }
+      } else {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            return res.end(JSON.stringify({
+              message: "unauthorized"
+            }))
+          }
     })
 
     this.post("/__authtics_host_apis__/get-host-ver", async (req, res) => {
@@ -739,6 +789,11 @@ export default class App {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
           version: packageJsonVersion
+        }))
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
         }))
       }
     })
@@ -782,6 +837,11 @@ export default class App {
           fileExists,
           filePath: (filePath ? filePath : "Cannot find file because autoPage is disabled.")
         }))
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     })
     this.post("/__authtics_host_apis__/ping", async (req, res) => {
@@ -792,6 +852,11 @@ export default class App {
       if (datMatched) {
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify({ status: "ok" }));
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     })
     this.post('/__authtics_host_apis__/get-connection', async (req, res) => {
@@ -816,6 +881,11 @@ export default class App {
             httpVersion: req.httpVersion
           }))
         //}
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
       }
     });
   }
