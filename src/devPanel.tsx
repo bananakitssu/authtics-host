@@ -11,7 +11,7 @@ import 'prismjs/components/prism-javascript';
 (Prism.languages.javascript as any)['builtin'] = /\b(window|document|console|navigator|localStorage|sessionStorage|fetch|Promise|setTimeout|setInterval|clearTimeout|clearInterval|requestAnimationFrame|Math|JSON|Object|Array|String|Number|Boolean|Date|RegExp|Error|Map|Set|Symbol|Proxy|Reflect|performance|history|location|screen|crypto|indexedDB|alert|confirm|prompt)\b/;*/
 //const isMobile = true;
 
-async function mapGeneratedLocation(
+export async function mapGeneratedLocation(
   location: ErrorLocation
 ): Promise<ErrorLocation> {
   try {

@@ -17,7 +17,7 @@
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
     "test": "npm run build && node dist/index.js",
-    "test:source-maps": "npm run build && node --test tests/source-map-access.test.mjs",
+    "test:source-maps": "npm run build && node --test tests/source-map-*.test.mjs",
     "playgroundTest": "npm run build && cd playground && node --experimental-strip-types index.ts",
     "playgroundTest2": "npm run build && cd playground2 && node --experimental-strip-types index.ts"
   },

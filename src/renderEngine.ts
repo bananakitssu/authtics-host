@@ -616,13 +616,18 @@ function isCacheValid(
   devPanelPath: string | null,
   clientBundlePath?: string,
   serverBundleRequired = true,
-  requiredArtifacts: string[] = []
+  requiredArtifacts: string[] = [],
+  checkArtifactFreshness = true
 ): boolean {
   if (!fs.existsSync(tempPath) || (serverBundleRequired && !fs.existsSync(serverCjsPath))) return false;
   if (clientBundlePath && !fs.existsSync(clientBundlePath)) return false;
   if (requiredArtifacts.some((artifactPath) => !fs.existsSync(artifactPath))) return false;
   try {
     const cacheMtime = fs.statSync(tempPath).mtimeMs;
+    if (
+      checkArtifactFreshness &&
+      requiredArtifacts.some((artifactPath) => fs.statSync(artifactPath).mtimeMs < cacheMtime)
+    ) return false;
     // Page file changed?
     if (fs.statSync(tsxPath).mtimeMs > cacheMtime) return false;
     // Template changed?
@@ -795,7 +800,8 @@ export async function renderPage(
       devPanelPath,
       requiredClientBundlePath,
       !serverCodeDisabled,
-      requiredMapArtifacts
+      requiredMapArtifacts,
+      false
     )
   ) {
     try {
@@ -836,11 +842,16 @@ export async function renderPage(
       }
       if (enableDiagnostics && renderMode !== "srtws") {
         clientMap = fs.readFileSync(clientMapPath, "utf-8");
+        if (!serverCodeDisabled) serverMap = fs.readFileSync(serverMapPath, "utf-8");
       }
       serverCode = serverCodeDisabled ? undefined : fs.readFileSync(serverCjsPath, "utf-8");
       //console.log(`[authtics] using cached bundle for ${path.basename(tsxPath)}`);
     } catch {
       // corrupt — rebuild
+      clientCode = undefined;
+      clientMap = undefined;
+      serverCode = undefined;
+      serverMap = undefined;
     }
   }
 
@@ -926,8 +937,6 @@ export async function renderPage(
     writeTempFile(tempPath, JSON.stringify({ clientCode }));
     freshWrite = true;*/
     if (serverCode) await fs.promises.writeFile(serverCjsPath, serverCode, "utf-8");
-    if (serverMap) await fs.promises.writeFile(serverMapPath, serverMap, "utf-8");
-    if (clientMap) await fs.promises.writeFile(clientMapPath, clientMap, "utf-8");
     if (separateClientBundle) {
       await fs.promises.writeFile(clientBundlePath, clientCode ?? "", "utf-8");
       writeTempFile(tempPath, JSON.stringify({
@@ -935,6 +944,14 @@ export async function renderPage(
       }));
     } else {
       writeTempFile(tempPath, JSON.stringify({ clientCode }));
+    }
+    if (serverMap) await fs.promises.writeFile(serverMapPath, serverMap, "utf-8");
+    if (clientMap) await fs.promises.writeFile(clientMapPath, clientMap, "utf-8");
+    if (requiredMapArtifacts.includes(clientMapPath) && !clientMap) {
+      throw new Error(`[HostJS] Source-map build did not produce ${clientMapPath}`);
+    }
+    if (requiredMapArtifacts.includes(serverMapPath) && !serverMap) {
+      throw new Error(`[HostJS] Source-map build did not produce ${serverMapPath}`);
     }
     freshWrite = true;
     //console.log(`[authtics] bundle cached for ${path.basename(tsxPath)}`);
