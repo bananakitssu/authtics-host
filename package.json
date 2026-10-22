@@ -7,7 +7,7 @@
   "type": "module",
   "sideEffects": false,
   "bin": {
-    "host": "dist/cli.js"
+    "host": "node bin/hostjs.js"
   },
   "exports": {
     ".": "./dist/index.js"
