@@ -568,8 +568,6 @@ let currentSize = 0;*/
 }
 
 
-
-
 // ---------------------------------------------------------------------------
 // App class
 // ---------------------------------------------------------------------------
@@ -1112,7 +1110,10 @@ if (ua.includes("Windows NT")) {
             try {
         let html = await renderPage(pausedTsxFile || "", url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1135,7 +1136,10 @@ if (ua.includes("Windows NT")) {
             try {
         let html = await renderPage(appPath, url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType);
@@ -1165,7 +1169,10 @@ if (ua.includes("Windows NT")) {
             try {
         let html = await renderPage(pausedTsxFile || "", url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1188,7 +1195,10 @@ if (ua.includes("Windows NT")) {
             try {
         let html = await renderPage(appPath, url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType);
@@ -1270,7 +1280,10 @@ if (typeof handler === 'string') {
             try {
         let html = await renderPage(pausedTsxFile || "", url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1293,7 +1306,10 @@ if (typeof handler === 'string') {
             try {
         let html = await renderPage(appPath, url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1323,7 +1339,10 @@ if (typeof handler === 'string') {
             try {
         let html = await renderPage(pausedTsxFile || "", url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1346,7 +1365,10 @@ if (typeof handler === 'string') {
             try {
         let html = await renderPage(appPath, url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1418,7 +1440,10 @@ if (typeof handler === 'string') {
       try {
         let html = await renderPage(notFoundPath, url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1446,7 +1471,10 @@ if (typeof handler === 'string') {
       
     if (fs.existsSync(tempFileForTsx(tsxPath || "")) && renderType === "srtws" && !srtws) {
       srtws = handleSrtwsConnection(server, tsxPath || "", config, url, req.cookies.dat, (p) => { routes.delete(`GET:${p}`) }, (f, p) => { routes.set(`GET:${p}`, (_, res) => {
-        res.setHeader("Content-Type", "application/javascript");
+        res.setHeader(
+          "Content-Type",
+          p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+        );
         res.end(f);
       }) });
     }
@@ -1455,7 +1483,10 @@ if (typeof handler === 'string') {
       try {
         const html = await renderPage(tsxPath, url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1490,7 +1521,10 @@ if (typeof handler === 'string') {
         try {
           const html = await renderPage(appPath, url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
           }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
@@ -1510,7 +1544,10 @@ if (typeof handler === 'string') {
       try {
         let html = await renderPage(notFoundPath, url, actuallyShowPanel, compiler, hotReload, autoPaging, config.autoPageDir, (routes.get("APP_TSX") || "") as string, (f, p) => {
           routes.set(`GET:${p}`, (_, res) => {
-            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader(
+              "Content-Type",
+              p.toLowerCase().endsWith(".map") ? "application/json" : "application/javascript",
+            );
             res.end(f);
           })
         }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
