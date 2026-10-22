@@ -17,6 +17,11 @@ or
 npm install @bananacool467/authtics-host@latest
 ```
 
+You may have to get **React** and **React DOM**:
+```bash
+npm i @types/react @types/react-dom
+```
+
 You can have auto paging enabled, auto paging checks your given directory for HTML and TSX files and then adds them to route. If auto filing is enabled, auto filing will check your given directory for files and add them accessible to route.
 
 To make your app, with auto paging and auto filing, your file tree should look like:
@@ -170,6 +175,11 @@ nvm use 22
 To run the project use:
 ```
 node --experimental-strip-types index.ts
+```
+
+Or:
+```
+hostjs start
 ```
 
 ## Result
@@ -365,6 +375,33 @@ But if you have multiple DATs, then use:
 There isn't any limit of DATs you can add.
 
 **(Note: Adding your DAT will give you access to Restart and Shutdown and Pause/Resume Users and other features in the Developer Panel)**
+
+## HostJS commands
+
+There are 3 different HostJS commands:
+
+```bash
+hostjs -v
+# or:
+hostjs --version
+# or:
+hostjs version
+```
+Returns the current HostJS *version*.
+
+```bash
+hostjs help
+```
+Returns all the avaliable HostJS commands.
+
+```bash
+hostjs start
+```
+Runs `node --experimental-strip-types index.ts` but you can use:
+```bash
+hostjs start path/to/script.ts
+```
+Which runs the same command but uses the path to the script instead of `index.ts`
 
 ## Reasons for the name, Authtics Host
 
