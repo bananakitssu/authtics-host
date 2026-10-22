@@ -675,13 +675,13 @@ export default class App {
       if (config_.dat && Array.isArray(config_.dat) && config_.dat.includes(req.dat)) datMatched = true;
       if (datMatched) {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ message: "Restarting..." }));
         const { spawn } = await import('node:child_process');
         const child = spawn(process.argv[0], process.argv.slice(1), {
           detached: true,
           stdio: 'inherit'
         });
         child.unref();
+        res.end(JSON.stringify({ message: "Restarting..." }));
         this.server?.close(() => {
           process.kill(process.pid, 'SIGTERM')
         })

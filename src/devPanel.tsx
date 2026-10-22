@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, MouseEvent } from 'react';
-import { ShieldCheck, Shield, CircleX, ChevronDown, ChevronUp, Bug, AlertTriangle, Info, ArrowLeft, Wifi, Terminal, Route, Globe, ChevronRight, ChevronLeft, Server, Cog, /*Search,*/ TriangleAlert, Eye, Zap, Power, Check as Tick, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Shield, CircleX, ChevronDown, ChevronUp, Bug, AlertTriangle, Info, ArrowLeft, Wifi, Terminal, Route, Globe, ChevronRight, ChevronLeft, Server, Cog, /*Search,*/ TriangleAlert, Eye, Zap, Power, Check as Tick, CheckCircle2, EyeOff, Copy, CopyCheck } from 'lucide-react';
 import {
   TraceMap,
   originalPositionFor,
@@ -10,6 +10,42 @@ import {
 import 'prismjs/components/prism-javascript';
 (Prism.languages.javascript as any)['builtin'] = /\b(window|document|console|navigator|localStorage|sessionStorage|fetch|Promise|setTimeout|setInterval|clearTimeout|clearInterval|requestAnimationFrame|Math|JSON|Object|Array|String|Number|Boolean|Date|RegExp|Error|Map|Set|Symbol|Proxy|Reflect|performance|history|location|screen|crypto|indexedDB|alert|confirm|prompt)\b/;*/
 //const isMobile = true;
+
+let pT: any, rT: any, sT: any;
+
+async function increaseDots(dots: number, setter: Function, type: number): Promise<number> {
+  return new Promise((r) => {
+    const t = setTimeout(() => {
+        if (type == 1) {
+          if (pT == null) r(0);
+        }
+        if (type == 2) {
+          if (rT == null) r(0);
+        }
+        if (type == 3) {
+          if (sT == null) r(0);
+        }
+        if (dots == 0) r(0);
+        let newDots = dots;
+        if (dots < 6) newDots++;
+        else newDots = 1;
+        r(newDots);
+      }, 250);
+    if (type === 1) pT = t;
+    if (type === 2) rT = t;
+    if (type === 3) sT = t;
+    setter(t);
+  });
+}
+
+function finalizeDots(text: string, dots: number) {
+  if (dots === 1) return text + "   ";
+  if (dots === 2) return text + ".  ";
+  if (dots === 3) return text + ".. ";
+  if (dots === 4) return text + "...";
+  if (dots === 5) return text + " ..";
+  if (dots === 6) return text + "  .";
+}
 
 export async function mapGeneratedLocation(
   location: ErrorLocation
@@ -725,7 +761,7 @@ function PanelButton({ onClick, onClick2, children, style, fullWidth, disabled, 
   style?: React.CSSProperties;
   fullWidth?: boolean;
   disabled?: boolean;
-  background?: string;
+  background?: string | number;
 }) {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -744,7 +780,7 @@ function PanelButton({ onClick, onClick2, children, style, fullWidth, disabled, 
       onMouseUp={() => setPressed(false)}
       style={{
         cursor: 'pointer',
-        borderRadius: '10px',
+        borderRadius: '50px',
         padding: '6px 10px',
         fontSize: '11px',
         display: 'flex',
@@ -757,9 +793,9 @@ function PanelButton({ onClick, onClick2, children, style, fullWidth, disabled, 
         background: disabled 
     ? '#bdbdbd' 
     : pressed 
-    ? `color-mix(in srgb, ${background} 12%, transparent)`
+    ? `color-mix(in srgb, ${background} 85%, transparent)`
     : hovered 
-    ? `color-mix(in srgb, ${background} 6%, transparent)`
+    ? `color-mix(in srgb, ${background} 95%, transparent)`
     : background ?? '#fff',
         transition: 'background 0.15s ease',
         ...style,
@@ -780,7 +816,7 @@ export default function DevPanel() {
   const [open, setOpen] = useState(false);
   const [errorBoxOpen, setErrorBoxOpen] = useState(false);
   const [errors, setErrors] = useState<LogEntry[]>([]);
-const [selectedError, setSelectedError] = useState<number>(1);
+  const [selectedError, setSelectedError] = useState<number>(1);
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [networkOpen, setNetworkOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
@@ -791,7 +827,9 @@ const [selectedError, setSelectedError] = useState<number>(1);
   const [panelCustomOpen, setPanelCustomOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shutdown, setShutdown] = useState(false);
-  const [shuttingDown, setShuttingDown] = useState(false);
+  const [shuttingDown, setShuttingDown] = useState<number>(0);
+  const [restarting, setRestarting] = useState<number>(0);
+  const [pausing, setPausing] = useState<number>(0);
   const [packageSecurityOpen, setPackageSecurityOpen] = useState(false);
   const [highRiskDeps, setHighRiskDeps] = useState<{
     suggestion: 'uninstall' | 'upgrade' | 'downgrade';
@@ -856,6 +894,7 @@ const [selectedError, setSelectedError] = useState<number>(1);
   const [locationMode, setLocationMode] =
   useState<"approximate" | "precise">("approximate");
   const NOTIFICATION_SLEEP_MS = 10 * 60 * 1000; // 10 minutes
+  const [copied, setCopied] = useState<boolean>(false);
 
 const notificationSleepingUntilRef = useRef<number>(0);
 const [notificationSleepingUntil, setNotificationSleepingUntil] =
@@ -879,6 +918,9 @@ const [notificationSleepingUntil, setNotificationSleepingUntil] =
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [datRestrictionMissing, setDatRestrictionMissing] = useState(true);
   const [heapResult, setHeapResult] = useState<string>("0 Bytes / 0 Bytes");
+  const [shuttingDownTimeout, setShuttingDownTimeout] =  useState<ReturnType<typeof setTimeout>>();
+  const [restartingTimeout, setRestartingTimeout] =  useState<ReturnType<typeof setTimeout>>();
+  const [pausingTimeout, setPausingTimeout] =  useState<ReturnType<typeof setTimeout>>();
 /*const [pos, setPos] = React.useState({ x: 20, y: 20 });
 const [dragging, setDragging] = React.useState(false);
 const offset = React.useRef({ x: 0, y: 0 });
@@ -937,6 +979,32 @@ const [rootEl, setRootEl] = useState<Element | null>(null);*/
       consoleScrollRef.current.scrollTop = consoleScrollRef.current.scrollHeight;
     }
   }, [filteredLogs, isAtBottom]);
+
+  useEffect(() => {
+    if (pausing == 0) {
+      clearTimeout(pausingTimeout);
+      clearTimeout(pT);
+      pT = null;
+    }
+    if (restarting == 0) {
+      clearTimeout(restartingTimeout);
+      clearTimeout(rT);
+      rT = null;
+    }
+    if (shuttingDown == 0) {
+      clearTimeout(shuttingDownTimeout);
+      clearTimeout(sT);
+      sT = null;
+    }
+    
+    async function run () {
+      if (pausing != 0) setPausing(await increaseDots(pausing, setPausingTimeout, 1));
+      if (restarting != 0) setRestarting(await increaseDots(restarting, setRestartingTimeout, 2));
+      if (shuttingDown != 0) setShuttingDown(await increaseDots(shuttingDown, setShuttingDownTimeout, 3));
+    }
+    
+    run();
+  }, [pausing, restarting, shuttingDown]);
 
 /*useEffect(() => {
   setRootEl(doc?.documentElement as HTMLElement);
@@ -1371,21 +1439,28 @@ useEffect(() => {
   }*/
 
   const restart = async () => {
+    setRestarting(1);
     await fetch('/__authtics_host_apis__/restart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ /*dat: cookie.get('dat') as string | null*/ })
     })
+    setRestarting(0);
+    clearTimeout(restartingTimeout);
+    setRestartingTimeout(undefined);
+    window.location.reload();
   }
 
   const shutDown = async () => {
-    setShuttingDown(true);
+    setShuttingDown(1);
     await fetch('/__authtics_host_apis__/shutdown', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ /*dat: cookie.get('dat') as string | null*/ })
     })
     setShutdown(true);
+    clearTimeout(shuttingDownTimeout);
+    setShuttingDownTimeout(undefined);
   }
 
   useEffect(() => {
@@ -1485,6 +1560,16 @@ useEffect(() => {
 
   return () => window.clearTimeout(timer);
 }, [notificationSleepingUntil]);
+
+  const handleCopy = async (text: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
   // Console + network interceptors
   useEffect(() => {
@@ -1693,6 +1778,7 @@ setHostName(window.location.hostname);
   }*/
 
   const pause_Resume_Users = async () => {
+    setPausing(1);
     if (usersPausedRealInfo) {
       const resp = await fetch('/__authtics_host_apis__/set-users-paused', {
         method: 'POST',
@@ -1718,6 +1804,9 @@ setHostName(window.location.hostname);
         setUsersPausedRealInfo(true);
       }
     }
+    setPausing(0);
+    clearTimeout(pausingTimeout);
+    setPausingTimeout(undefined);
   }
 
   return (
@@ -2032,10 +2121,10 @@ setHostName(window.location.hostname);
         maxHeight: drawerHeight,
         opacity: open ? 1 : 0,
         pointerEvents: open ? 'auto' : 'none',
-        overflow: (!consoleOpen && !networkOpen && !aboutHostOpen && !webpageInfoOpen && !clientInfoOpen ? 'hidden auto' : 'hidden'),
         borderRadius: '10px',
         transition: 'max-height 0.35s ease, opacity 0.25s ease',
         border: '1px solid #e6e3e3',
+        overflow: (!consoleOpen && !packageSecurityOpen && !settingsOpen && !panelCustomOpen && !serverInfoOpen && !routeOpen && !networkOpen && !aboutHostOpen && !webpageInfoOpen && !clientInfoOpen ? 'hidden auto' : 'hidden'),
       }}>
         <div style={{
           background: '#f7f7f7',
@@ -2067,7 +2156,7 @@ setHostName(window.location.hostname);
                   <Terminal size={12} color="#16a34a" /> Console
                 </span>
                 <span style={{ fontSize: '10px', color: '#aaa', marginLeft: '2px' }}>
-                  {filteredLogs.length} message{filteredLogs.length !== 1 ? 's' : ''} shown, {logs.length} in total
+                  {logs.length} log{logs.length !== 1 ? 's' : ''}
                 </span>
                 <PanelButton onClick={() => setLogs([])} style={{ color: '#aaa', marginLeft: 'auto' }}>
                   Clear
@@ -2327,7 +2416,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                   justifyContent: 'space-between',
                   padding: '6px 10px',
                   background: '#fff',
-                  borderRadius: '10px',
+                  borderRadius: '50px',
                   border: '1px solid #eee',
                   fontSize: '12px',
                   color: '#333',
@@ -2443,7 +2532,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2460,10 +2549,11 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
+            overflowWrap: 'break-word', wordBreak: 'break-word',
           }}>
             <span style={{ fontSize: '12px', color: '#333' }}>
               File Path
@@ -2477,7 +2567,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2518,7 +2608,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2535,7 +2625,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2552,7 +2642,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2569,7 +2659,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2607,7 +2697,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2624,7 +2714,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2641,7 +2731,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2704,7 +2794,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               <ArrowLeft size={12} /> Back
             </PanelButton>
             <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
-              <Cog size={12} color="#3b82f6" /> Panel Configuration
+              <Cog size={12} color="#3b82f6" /> Panel Customization
             </span>
           </div>
           <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display:  'flex', flexDirection: 'column', gap: '8px' }}>
@@ -2714,7 +2804,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               justifyContent: 'space-between',
               padding: '6px 10px',
               background: '#fff',
-              borderRadius: '10px',
+              borderRadius: '50px',
               border: '1px solid #eee',
               alignItems: 'center'
             }}>
@@ -2788,7 +2878,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2805,7 +2895,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2814,7 +2904,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               Made By
             </span>
             <span style={{ fontSize: '12px', color: 'orange' }}>
-              bananakitssu
+              bananakitssu ( bananacool467 )
             </span>
           </div>
           <a style={{
@@ -2822,7 +2912,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2862,7 +2952,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2879,7 +2969,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -2896,7 +2986,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             justifyContent: 'space-between',
             padding: '6px 10px',
             background: '#fff',
-            borderRadius: '10px',
+            borderRadius: '50px',
             border: '1px solid #eee',
             fontSize: '12px',
             color: '#333',
@@ -3077,22 +3167,44 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               flexDirection: 'column',
             }}>
               <div style={{
-                justifyContent: 'space-between',
+                flexDirection: "column",
                 padding: '6px 10px',
                 background: '#fff',
                 borderRadius: '10px',
                 border: '1px solid #eee',
                 fontSize: '12px',
                 color: '#333',
-                display: 'flex'
+                display: 'flex',
+                gap: "8px"
               }}/*onContextMenu={() => setContextMenuShown(true)} onTouchStart={datTouchStart} onTouchEnd={datTouchEnd}*/>
                 <span style={{ fontSize: '12px', color: '#333', position: 'relative' }}>
                   DAT (Developer Access Token)
                 </span>
                 <div style={{ position: 'relative', 
                 display: 'inline-flex' }}>
-                  <span style={{ fontSize: '12px', color: 'blue' }}>
-                    {token}
+                  <span style={{ fontSize: '12px', color: 'blue', display: "flex", justifyContent: "space-between" }}>
+                    {token}{!tokenHidden && (
+        <div style={{
+          position: 'absolute',
+          marginTop: '-2.5px',
+          height: '100%',
+          backdropFilter: 'blur(10px)',
+          backgroundColor: 'rgba(255,255,255,0.3)',
+          cursor: 'pointer',
+          padding: '2.5px 2.5px',
+          borderRadius: '8px',
+          textAlign: 'center',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '4px',
+          paddingLeft: 5,
+          paddingRight: 5,
+          right: 0
+        }} onClick={() => setTokenHidden(true)}>
+          <EyeOff size={12}/>Hide
+        </div>
+                    )}
                   </span>
                 {tokenHidden && (
     <div style={{
@@ -3115,6 +3227,11 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
     </div>
   )}
                 </div>
+                <PanelButton onClick={() => {
+        handleCopy(token || "");
+                }} fullWidth style={{ color: '#fff', justifyContent: 'center', height: '32px', background: '#00b2ed' }}>
+                  {copied ? (<CopyCheck size={16} />) : (<Copy size={16} />)} {copied ? "Copied!" : "Copy" }
+                </PanelButton>
               </div>
               {tokenLength !== 16 ? (<>
                   <div style={{
@@ -3151,19 +3268,19 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               ) : (<></>)}
                 <PanelButton onClick={() => { restart() }} fullWidth style={{ color: '#fff', justifyContent: 'center', height: '32px', background: (datRestrictionMissing ? '#bdbdbd': '#ba4e4e') }} disabled={datRestrictionMissing}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'center' }}>
-                    Restart App
+                    <pre>{restarting ? String(finalizeDots("Restarting App", restarting)) : "Restart App"}</pre>
                   </span>
                 </PanelButton>
               {datRestrictionMissing ? (<span style={{ display: 'flex', opacity: 0.5, fontSize: 10, justifyContent: 'center', alignItems: 'center', gap: '8px' }}><Info size={30} />Restarting the app is unavaliable. Set "dat" to your current DAT in the Authtics Host config to set restriction and then restart.</span>) : (<></>)}
                 <PanelButton onClick={() => { shutDown() }} fullWidth style={{ color: '#fff', justifyContent: 'center', height: '32px', background: (datRestrictionMissing ? '#bdbdbd': '#ba4e4e') }} disabled={datRestrictionMissing}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'center' }}>
-                    {shuttingDown ? "Shutting Down App" : "Shut Down App"}
+                    <pre>{shuttingDown ? String(finalizeDots("Shutting Down App", shuttingDown)) : "Shut Down App"}</pre>
                   </span>
                 </PanelButton>
               {datRestrictionMissing ? (<span style={{ display: 'flex', opacity: 0.5, fontSize: 10, justifyContent: 'center', alignItems: 'center', gap: '8px' }}><Info size={30} />Shutting down the app is unavaliable. Set "dat" to your current DAT in the Authtics Host config to set restriction and then restart.</span>) : (<></>)}
               <PanelButton onClick={() => { pause_Resume_Users() }} fullWidth style={{ color: (datRestrictionMissing ? '#fff' : '#333'), justifyContent: 'center', height: '32px', background: (datRestrictionMissing ? '#bdbdbd' : '#f2f2f2') }} disabled={datRestrictionMissing}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'center' }}>
-                    {usersPausedRealInfo ? "Resume Users" : "Pause Users"}
+                    <pre>{pausing ? String(finalizeDots("Pausing", pausing)) : usersPausedRealInfo ? "Resume Users" : "Pause Users"}</pre>
                   </span>
                 </PanelButton>
               {datRestrictionMissing ? (<span style={{ display: 'flex', opacity: 0.5, fontSize: 10, justifyContent: 'center', alignItems: 'center', gap: '8px' }}><Info size={30} />Pausing users from accessing the app is unavaliable. Set "dat" to your current DAT in the Authtics Host config to set restriction and then restart.</span>) : (<></>)}
