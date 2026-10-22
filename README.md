@@ -1,6 +1,6 @@
 # Authtics Host
 
-Version 0.2.8, License: MIT
+Version 0.2.9, License: MIT
 
 Authtics Host is a web framework inspired by Next.js. Authtics Host supports SSR (Server-Side Rendering), SSG (Static Site Generation), CSR (Client-Side Rendering) and SRTWS (Site Rendering Through WebSockets) and uses **Esbuild**. This is not to be confused with auth platforms.
 
