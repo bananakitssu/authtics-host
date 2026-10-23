@@ -163,8 +163,10 @@ export async function mapGeneratedLocation(
       /\/\/[#@]\s*sourceMappingURL=([^\s]+)/
     )?.[1];
 
-    if (!sourceMapReference) {
-      console.warn("[HostJS] No source map URL found in", location.file);
+    if (
+      typeof sourceMapReference !== "string" ||
+      sourceMapReference.trim().length === 0
+    ) {
       return location;
     }
 
