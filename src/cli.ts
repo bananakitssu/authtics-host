@@ -600,11 +600,13 @@ export default class App {
       let datMatched = false;
       if (config_.dat && config_.dat == req.dat) datMatched = true;
       if (config_.dat && Array.isArray(config_.dat) && config_.dat.includes(req.dat)) datMatched = true;
-      res.writeHead(200, { "Content-Type": "application/json" });
-      if (datMatched) {res.end(JSON.stringify({
+      if (datMatched) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
         paused: (datMatched ? false : usersPaused),
         realInfo: usersPaused
-      }))} else {
+      }))
+      } else {
         res.writeHead(401, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({
           message: "unauthorized"

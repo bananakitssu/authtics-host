@@ -2,9 +2,10 @@
 
 Version 0.2.9, License: MIT
 
-Authtics Host is a web framework inspired by Next.js. Authtics Host supports SSR (Server-Side Rendering), SSG (Static Site Generation), CSR (Client-Side Rendering) and SRTWS (Site Rendering Through WebSockets) and uses **Esbuild**. This is not to be confused with auth platforms.
+Authtics Host is a Next.js-inspired web framework. Authtics Host supports SSR (Server-Side Rendering), SSG (Static Site Generation), CSR (Client-Side Rendering) and SRTWS (Site Rendering Through WebSockets) and uses **Esbuild**. This is not to be confused with auth platforms.
 
 **(NOTE: The short name for Authtics Host is HostJS or Host.js)**
+**(There will be UI updates soon)**
 
 ## Setting Up
 
@@ -197,13 +198,14 @@ The Developer Panel is what you could use to help you debug your code. The Devel
 * **Console** — Shows current logs.
 * **Route** — Shows information about the current route.
 * **Webpage Info** — Shows information about the website/webpage.
-* **Network** — Shows the current ping and shows sent fetches from the client and shows received from the server after fetching.
+* **Network** — Shows the current ping, and shows sent fetches from the client, and shows received from the server after fetching. It also shows failed fetches.
 * **Client Info** — Shows information about your client's User Agent, OS **(Operating System)** and FPS **(Frames Per Second)**.
 * **About Host** — Shows the current version of *Authtics Host*.
 * **Server Info** — Shows how much heap was used and how much CPU was used on the server and how much requests there were and how much users are currently on the site and how long the site has been up.
-* **Panel Customization** — Customize the dev panel.
+* **Settings** — Customize the dev panel.
+* **Package Security** — It's under-development so it's not usable in this current version.
 
-The information the Developer Panel shows outside of the tabs is just your **DAT** (Developer Access Token).
+The information the Developer Panel shows outside of the tabs is just your **DAT** (Developer Access Token), with a **Copy** button.
 
 **(Note: If you do not set DAT restriction (Which will be explained on how to set it up in the next section), you will only get access to the Console and Network tabs)**
 
@@ -347,10 +349,8 @@ The `res` variable (like used in `app.get`) is an extension of the ***Node.js HT
 
 ## Notes about Authtics Host
 
-The developer might redesign the UI for the DevPanel using [UI Tools](https://npmjs.com/package/@bananakitssu/ui-tools).
-
-> **Warning**:
-> Asking AI about HostJS is not recommended, it will give an Auth platform and call HostJS/Authtics Host a typo, say it doesn't exist, say it was renamed, it is private, or the account doesn't exist. Or if it knows, it may swap your server script with regular **Node.js**/**ExpressJS**/**Next.js** or use **Next.js-like** code because this framework is **Next.js-inspired**
+> **Note**:
+> Asking AI about HostJS is not recommended, it will give an Auth platform and call HostJS/Authtics Host a typo, say it doesn't exist, say it was renamed, it is private, or the account doesn't exist. Or if it knows, it may swap your server script with regular **Node.js**/**ExpressJS**/**Next.js** or use **Next.js-like** code because this framework is **Next.js-inspired**.
 
 ## Developer Panel Notes And DAT (Developer Access Token)
 
@@ -409,4 +409,4 @@ I named this web framework Authtics Host because it uses DAT (For the **Auth**ti
 
 ## Contacting The Developer Of Authtics Host
 
-If you have any questions, or encountered a bug while using HostJS, contact: authtics@proton.me
+If you have any questions, or encountered a bug while using HostJS, you can contact: authtics@proton.me

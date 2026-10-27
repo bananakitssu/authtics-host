@@ -1,5 +1,6 @@
-import React, { ReactNode, useState, useEffect, useRef, MouseEvent } from 'react';
+import React, { ReactNode, useState, useEffect, useRef, MouseEvent, useCallback } from 'react';
 import { ShieldCheck, Shield, CircleX, ChevronDown, ChevronUp, Bug, AlertTriangle, Info, ArrowLeft, Wifi, Terminal, Route, Globe, ChevronRight, ChevronLeft, Server, Cog, /*Search,*/ TriangleAlert, Eye, Zap, Power, Check as Tick, CheckCircle2, EyeOff, Copy, CopyCheck } from 'lucide-react';
+import { devLoggerVerbose } from "./devLogger.js";
 import {
   TraceMap,
   originalPositionFor,
@@ -12,6 +13,283 @@ import 'prismjs/components/prism-javascript';
 //const isMobile = true;
 
 let pT: any, rT: any, sT: any;
+
+const ANSI_COLORS: Record<number, string> = {
+  30: "#000000",
+  31: "#AA0000",
+  32: "#00AA00",
+  33: "#AA5500",
+  34: "#0000AA",
+  35: "#AA00AA",
+  36: "#00AAAA",
+  37: "#AAAAAA",
+  90: "#555555",
+  91: "#FF5555",
+  92: "#55FF55",
+  93: "#FFFF55",
+  94: "#5555FF",
+  95: "#FF55FF",
+  96: "#55FFFF",
+  97: "#FFFFFF",
+};
+
+interface AnsiPart {
+  text: string;
+  color: string | null;
+}
+
+function parseAnsiColors(text: string): AnsiPart[] {
+  const parts: AnsiPart[] = [];
+  const pattern = /\x1b\[([0-9;]*)m/g;
+
+  let lastIndex = 0;
+  let color: string | null = null;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({
+        text: text.slice(lastIndex, match.index),
+        color,
+      });
+    }
+
+    const codes = match[1]
+      ? match[1].split(";").map(Number)
+      : [0];
+
+    for (const code of codes) {
+      if (code === 0 || code === 39) {
+        color = null;
+      } else if (ANSI_COLORS[code] !== undefined) {
+        color = ANSI_COLORS[code];
+      }
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({
+      text: text.slice(lastIndex),
+      color,
+    });
+  }
+
+  return parts;
+}
+
+function AnsiText({ text }: { text: string }) {
+  const parts = parseAnsiColors(text);
+
+  return (
+    <>
+      {parts.map((part, index) => (
+        <span
+          key={index}
+          style={
+            part.color
+              ? { color: part.color }
+              : undefined
+          }
+        >
+          {part.text}
+        </span>
+      ))}
+    </>
+  );
+}
+
+
+function InspectValue({
+  value,
+  depth = 0,
+  quoted = false,
+}: {
+  value: unknown;
+  depth?: number;
+  quoted?: boolean;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [showAll, setShowAll] = React.useState(false);
+  const [circular] = React.useState(() => new WeakSet<object>());
+  const [hovered, setHovered] = React.useState(false);
+
+  if (typeof value === "function") {
+    return (
+      <span style={{ color: "#795e26" }}>
+        {`[Function${value.name ? ` ${value.name}` : ""}]`}
+      </span>
+    );
+  }
+
+  if (typeof value === "string") {
+    return (
+      <AnsiText
+        text={quoted ? JSON.stringify(value) : value}
+      />
+    );
+  }
+
+  if (value === null) {
+    return <span style={{ color: "#888" }}>null</span>;
+  }
+
+  if (value === undefined) {
+    return <span style={{ color: "#888" }}>undefined</span>;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return (
+      <span style={{ color: typeof value === "number" ? "#098658" : "#0000ff" }}>
+        {String(value)}
+      </span>
+    );
+  }
+
+  if (typeof value === "bigint") {
+    return <span>{String(value)}n</span>;
+  }
+
+  if (typeof value === "symbol" || typeof value === "function") {
+    return <span style={{ color: "#795e26" }}>{String(value)}</span>;
+  }
+
+  if (typeof value !== "object") {
+    return <span>{String(value)}</span>;
+  }
+
+  if (circular.has(value)) {
+    return <span style={{ color: "#888" }}>[Circular]</span>;
+  }
+
+  const isArray = Array.isArray(value);
+  const entries: [string, unknown][] = isArray
+    ? Array.from(value as unknown[]).map((item, index) => [String(index), item])
+    : Object.keys(value).map((key) => [
+        key,
+        (value as Record<string, unknown>)[key],
+      ]);
+
+  if (entries.length === 0) {
+    return <span>{isArray ? "[]" : "{}"}</span>;
+  }
+
+  const open = expanded || depth === 0 && showAll;
+  const preview = isArray
+    ? `[ ${entries.slice(0, 3).map(([key, item]) =>
+        `${key}: ${formatPreview(item)}`
+      ).join(", ")}${entries.length > 3 ? ", …" : ""} ]`
+    : `{ ${entries.slice(0, 3).map(([key, item]) =>
+        `${key}: ${formatPreview(item)}`
+      ).join(", ")}${entries.length > 3 ? ", …" : ""} }`;
+
+  return (
+    <span>
+      <button
+        type="button"
+        onClick={() => setExpanded(prev => !prev)}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          all: "unset",
+          cursor: "pointer",
+          color: "#555",
+          fontFamily: "monospace",
+          borderRadius: "3px",
+          padding: "1px 3px",
+          background: hovered ? "rgba(0, 0, 0, 0.06)" : "transparent",
+        }}
+      >
+        {open ? "▾" : "▸"}{" "}
+        {open ? (isArray ? "[" : "{") : preview}
+        {!open && (
+          <span style={{ color: "#888" }}>
+            {" "}
+            ({entries.length} {isArray ? "items" : "keys"})
+          </span>
+        )}
+      </button>
+
+      
+{open && (
+  <span
+    style={{
+      display: 'block',
+      paddingLeft: '14px',
+      minWidth: 0,
+      maxWidth: '100%',
+      overflowWrap: 'anywhere',
+      wordBreak: 'break-word',
+      whiteSpace: 'pre-wrap',
+      boxSizing: 'border-box',
+    }}
+  >
+    {entries.map(([key, item]) => (
+      <span
+        key={key}
+        style={{
+          display: "block",
+          paddingLeft: "14px",
+        }}
+      >
+        {!isArray && (
+          <span style={{ color: "#881391" }}>{key}: </span>
+        )}
+        {isArray && (
+          <span style={{ color: "#888" }}>{key}: </span>
+        )}
+        <InspectValue
+          value={item}
+          depth={depth + 1}
+          quoted={true}
+        />
+      </span>
+    ))}
+    <span style={{ display: "block" }}>
+      {isArray ? "]" : "}"}
+    </span>
+  </span>
+)}
+
+    </span>
+  );
+}
+
+function formatPreview(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "function") return "[Function]";
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (typeof value === "object") {
+    return Array.isArray(value) ? "[…]" : "{…}";
+  }
+  return String(value);
+}
+
+function LogArguments({
+  args,
+  message,
+}: {
+  args?: unknown[];
+  message: string;
+}) {
+  if (!args) {
+    return <AnsiText text={message} />;
+  }
+
+  return (
+    <>
+      {args.map((arg, index) => (
+        <React.Fragment key={index}>
+          {index > 0 && " "}
+          <InspectValue value={arg} />
+        </React.Fragment>
+      ))}
+    </>
+  );
+}
+
 
 function Tab({
   children
@@ -141,6 +419,8 @@ function finalizeDots(text: string, dots: number) {
   if (dots === 6) return text + "  .";
 }
 
+const ignoredFetches: string[] = [];
+
 export async function mapGeneratedLocation(
   location: ErrorLocation
 ): Promise<ErrorLocation> {
@@ -149,9 +429,12 @@ export async function mapGeneratedLocation(
       return location;
     }
 
+    const addedIndex = ignoredFetches.length;
+    ignoredFetches.push(location.file);
     const response = await fetch(location.file, {
       cache: "no-store",
     });
+    ignoredFetches.splice(addedIndex, 1);
 
     if (!response.ok) {
       return location;
@@ -193,10 +476,13 @@ export async function mapGeneratedLocation(
         sourceMapReference,
         response.url || new URL(location.file, window.location.href).href
       );
+      const addedIndex = ignoredFetches.length;
+      ignoredFetches.push(mapUrl.toString());
       const mapResponse = await fetch(mapUrl, {
         cache: "no-store",
         credentials: "same-origin",
       });
+      ignoredFetches.splice(addedIndex, 1);
 
       if (!mapResponse.ok) {
         console.warn("[HostJS] Could not load source map:", mapUrl.href);
@@ -233,7 +519,7 @@ const traceMap = new TraceMap(sourceMap);
       lines: getApproximateLines(sourceText, original.line),
     };
   } catch (error) {
-    console.warn("[HostJS] Could not map source location:", error);
+    //console.warn("[HostJS] Could not map source location:", error);
     return location;
   }
 }
@@ -348,6 +634,7 @@ interface LogEntry {
   source: string;
   stack?: string;
   location?: ErrorLocation;
+  args?: unknown[];
 }
 
 interface NetworkFetch {
@@ -474,7 +761,8 @@ function installNetworkInterceptor(
   setResource: (f: Resource) => void,
   rmvResource: (f: Resource) => void,
   onBytesClient: (sent: number) => void,
-  onBytesServer: (received: number) => void
+  onBytesServer: (received: number) => void,
+  onFailedFetch: (f: number) => void
 ) {
   if ((window as any).__authtics_network_intercepted__) return;
   (window as any).__authtics_network_intercepted__ = true;
@@ -485,10 +773,21 @@ function installNetworkInterceptor(
     const savedFetchId = fetchId;
     const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
     const method = (args[1]?.method ?? 'GET').toUpperCase();
+    if (ignoredFetches.some(iF => url.includes(iF))) {
+      try {
+        return originalFetch(...args);
+      } catch (e) {
+        throw e;
+      }
+    }
  
     // Filter out DevPanel's own internal pings so they don't show up in the network tab
     if (url.startsWith('/__authtics_host_apis__/') || url === "/__authtics_hmr__") {
-      return originalFetch(...args);
+      try {
+        return originalFetch(...args);
+      } catch (e) {
+        throw e;
+      }
     }
 
     // Estimate bytes sent: body size + rough header/URL overhead
@@ -514,6 +813,10 @@ function installNetworkInterceptor(
       clone.arrayBuffer().then(buf => {
         onBytesServer(buf.byteLength);
       }).catch(() => {});
+
+      if (clone.status != 200) {
+        onFailedFetch(1);
+      }
  
       return resp;
     } catch (e) {
@@ -820,6 +1123,7 @@ const generatedLocation = parseStackLocation(
     detail: {
       type,
       message,
+      args,
       time: Date.now(),
       source: location.file || getCallerSource(),
       stack,
@@ -871,6 +1175,7 @@ function PanelButton({ onClick, onClick2, children, style, fullWidth, disabled, 
 }) {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const baseBackground = style?.background ?? background ?? "#fff";
   return (
     <div
       onClick={(e: MouseEvent<HTMLDivElement>) => {
@@ -885,26 +1190,25 @@ function PanelButton({ onClick, onClick2, children, style, fullWidth, disabled, 
       onMouseDown={() => setPressed(true)}
       onMouseUp={() => setPressed(false)}
       style={{
-        cursor: 'pointer',
-        borderRadius: '50px',
-        padding: '6px 10px',
-        fontSize: '11px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '5px',
-        width: fullWidth ? '100%' : undefined,
-        boxSizing: 'border-box',
-        userSelect: 'none',
-        /*background: disabled ? '#bdbdbd' : /*pressed ? 'rgba(0,0,0,0.12)' : hovered ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.03)'*//*background,*/
-        background: disabled 
-    ? '#bdbdbd' 
-    : pressed 
-    ? `color-mix(in srgb, ${background} 85%, transparent)`
-    : hovered 
-    ? `color-mix(in srgb, ${background} 95%, transparent)`
-    : background ?? '#fff',
-        transition: 'background 0.15s ease',
+        cursor: disabled ? "default" : "pointer",
+        borderRadius: "50px",
+        padding: "6px 10px",
+        fontSize: "11px",
+        display: "flex",
+        alignItems: "center",
+        gap: "5px",
+        width: fullWidth ? "100%" : undefined,
+        boxSizing: "border-box",
+        userSelect: "none",
         ...style,
+        background: disabled
+          ? "#bdbdbd"
+          : pressed
+            ? `color-mix(in srgb, ${baseBackground} 85%, transparent)`
+            : hovered
+              ? `color-mix(in srgb, ${baseBackground} 95%, transparent)`
+              : baseBackground,
+        transition: "background 0.15s ease",
       }}>
       {children}
     </div>
@@ -967,6 +1271,7 @@ export default function DevPanel() {
   const [ping__, setPing__] = useState(0);
   const [networkFetches, setNetworkFetches] = useState<NetworkFetch[]>([]);
   const [eventSources, setEventSources] = useState<EventSourceConnection[]>([]);
+  const datMatchingRef = useRef<boolean>(false);
   //const [usersPaused, setUsersPaused] = useState<boolean>(false);
   const [usersPausedRealInfo, setUsersPausedRealInfo] = useState<boolean>(false);
   const [webSockets, setWebSockets] = useState<WebSocketConnection[]>([]);
@@ -1005,6 +1310,8 @@ export default function DevPanel() {
 const notificationSleepingUntilRef = useRef<number>(0);
 const [notificationSleepingUntil, setNotificationSleepingUntil] =
   useState<number>(0);
+
+  
 
   const sleepErrorNotifications = () => {
   const until = Date.now() + NOTIFICATION_SLEEP_MS;
@@ -1346,6 +1653,7 @@ useEffect(() => {
 
   useEffect(() => {
     const getPath = async () => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-file-by-pathname', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1356,9 +1664,13 @@ useEffect(() => {
         const data = await resp.json();
         setPath(data.filePath);
       }
+      } catch (e) {
+        
+      }
     }
 
     const getDatMatching = async () : Promise<string> => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-dat-matching', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1373,6 +1685,8 @@ useEffect(() => {
         body: JSON.stringify({ /*dat: cookie.get('dat') as string | null*/ })
       });
         let paused = false;
+        const isMatching = data.isMatching;
+        datMatchingRef.current = isMatching;
         if (resp3.status === 200) {
           const data = await resp3.json();
           paused = data.paused as boolean;
@@ -1391,14 +1705,21 @@ useEffect(() => {
         const data = await resp2.json();
         setDatRestrictionMissing(!data.enabled as boolean);
         datRestrictionMissingRef.current = !data.enabled as boolean;
+        if (data.enabled && isMatching) {
+          devLoggerVerbose.log("Developer is authorized!");
+        }
         return "";
       }
       }
 
       return "";
+      } catch (e) {
+        return "";
+      }
     }
 
     const getRenderType = async () => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-render-type', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1408,9 +1729,13 @@ useEffect(() => {
         const data = await resp.json();
         setRenderType(data.renderType as string);
       }
+      } catch (e) {
+        
+      }
     }
 
     const getUsage = async () => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-cpu_memory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1422,9 +1747,13 @@ useEffect(() => {
         heapUsage.current = (data.heapUsed as number);
         heapTotal.current = (data.heapTotal as number);
       }
+      } catch (e) {
+        
+      }
     }
 
     const getHostVersion = async () => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-host-ver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1435,9 +1764,13 @@ useEffect(() => {
 
         setHostVersion(data.version as string);
       }
+      } catch (e) {
+        
+      }
     }
 
     const getCompilerType = async () => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-compiler', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1447,9 +1780,13 @@ useEffect(() => {
         const data = await resp.json();
         setCompilerType(data.compiler as string);
       }
+      } catch (e) {
+        
+      }
     }
 
     const getHttpVersion = async () => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1459,20 +1796,29 @@ useEffect(() => {
         const data = await resp.json();
         setHttpVersion(data.httpVersion as string);
       }
+      } catch (e) {
+        
+      }
     }
 
     const formatSeconds = (totalSeconds: number): string => {
+      try {
       const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor(totalSeconds / 3600);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
   const pad = (num: number) => String(num).padStart(2, '0');
 
   return `${pad(days)}:${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+      } catch (e) {
+        devLoggerVerbose.error("Failed to calculate time (1)");
+        return "??:??:??:??";
+      }
 };
 
     const userSettings = async () => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-user-settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1482,9 +1828,13 @@ useEffect(() => {
         const data = await resp.json();
         setErrorBoxOpenable(data.showError as boolean);
       }
+      } catch (e) {
+        
+      }
     }
 
     const update = async () => {
+      try {
       const resp = await fetch('/__authtics_host_apis__/get-server-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1496,12 +1846,15 @@ useEffect(() => {
         setRequests(data.totalRequests as number);
         setUsers(data.users as number);
       }
+      } catch (e) {
+        
+      }
     }
 
     setTimeout(async () => {
       await getDatMatching();
       setTimeout(() => {
-      if (datRestrictionMissingRef.current === false) {
+      if (datRestrictionMissingRef.current === false && datMatchingRef.current === true) {
         getPath();
         getCompilerType();
         getHttpVersion();
@@ -1591,6 +1944,7 @@ useEffect(() => {
   const pendingReceived = useRef(0);
   const [sentHistory, setSentHistory] = useState<number[]>(Array(MAX_POINTS).fill(0));
   const [receivedHistory, setReceivedHistory] = useState<number[]>(Array(MAX_POINTS).fill(0));
+  const [failedHistory, setFailedHistory] = useState<number[]>(Array(MAX_POINTS).fill(0));
   const [cpuUsageHistory, setCpuUsageHistory] = useState<number[]>(Array(MAX_POINTS).fill(0));
   const [heapUsageHistory, setHeapUsageHistory] = useState<number[]>(Array(MAX_POINTS).fill(0));
   const [fpsHistory, setFpsHistory] = useState<number[]>(Array(MAX_POINTS).fill(0));
@@ -1649,6 +2003,7 @@ useEffect(() => {
       setHeapUsageHistory(prev => [...prev.slice(-(MAX_POINTS - 1)), h_num]);
       setSentHistory(prev => [...prev.slice(-(MAX_POINTS - 1)), s]);
       setReceivedHistory(prev => [...prev.slice(-(MAX_POINTS - 1)), r]);
+      setFailedHistory(prev => [...prev.slice(-(MAX_POINTS - 1)), r]);
       setFpsHistory(prev => [...prev.slice(-(MAX_POINTS - 1)), f]);
     }, 1000);
     return () => clearInterval(interval);
@@ -1695,6 +2050,9 @@ useEffect(() => {
       },
       (received) => {
         pendingReceived.current += received;
+      },
+      (f) => {
+        setFailedHistory(prev => [...prev.slice(-499), f]);
       }
     );
 
@@ -2327,6 +2685,7 @@ setHostName(window.location.hostname);
                             fontSize: '11px',
                             fontFamily: 'monospace',
                             wordBreak: 'break-all',
+                            overflowWrap: 'anywhere',
                           }}>
                             {/*log.type === "Eval" ? (<div style={{ display: 'flex', flexDirection: 'row', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>(You): <div
     style={{
@@ -2336,7 +2695,7 @@ setHostName(window.location.hostname);
       wordBreak: 'break-all',
     }}
     dangerouslySetInnerHTML={{ __html: Prism.highlight(log.message, Prism.languages.javascript, 'javascript') }}
-  /></div>) : */log.message}
+  /></div>) : */<LogArguments args={log.args} message={String(log.message)} />}
                           </span>
                         </div>
                       );
@@ -2537,6 +2896,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                 {/* Charts — update every 2s */}
                 <Sparkline data={receivedHistory} color="#3b82f6" label="Received" unit=" bytes" />
                 <Sparkline data={sentHistory}     color="#16a34a" label="Sent"     unit=" bytes" />
+                <Sparkline data={failedHistory}   color="#D70040" label="Failed"   unit=" count" />
                 <span style={{fontSize: '15px', color: '#333', fontWeight: 'bold' }}>Fetches — {networkFetches.length} total fetches</span>
 
                 {/* Request log */}
@@ -3269,7 +3629,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               display: 'flex',
               gap: '6px',
               overflowY: 'auto',
-              maxHeight: '260px',
+              //maxHeight: '260px',
               flexDirection: 'column',
             }}>
               <div style={{
