@@ -376,6 +376,43 @@ There isn't any limit of DATs you can add.
 
 **(Note: Adding your DAT will give you access to Restart and Shutdown and Pause/Resume Users and other features in the Developer Panel)**
 
+## Robots.txt Generation
+
+HostJS can generate `/robots.txt` from your configuration, so you do not need to create the file manually.
+
+Add a `robots` object inside `defineConfig`:
+
+```ts
+robots: {
+  enabled: true,
+  userAgent: "*",
+  allow: ["/"],
+  disallow: ["/admin", "/private"],
+  sitemap: "https://example.com/sitemap.xml"
+}
+```
+
+- `enabled` — Enables generated `/robots.txt`. It defaults to `true` when a `robots` object is provided.
+- `userAgent` — A crawler name or an array of crawler names. Defaults to `"*"` (all crawlers).
+- `allow` — URL paths crawlers may access.
+- `disallow` — URL paths crawlers should not access.
+- `sitemap` — An absolute HTTP or HTTPS sitemap URL, or an array of sitemap URLs.
+
+For example, the configuration above generates:
+
+```text
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /private
+
+Sitemap: https://example.com/sitemap.xml
+```
+
+The generated response is served for `GET /robots.txt` and `HEAD /robots.txt`. If `robots` is omitted or `enabled: false`, HostJS does not generate the endpoint, so a regular `robots.txt` in the configured public folder can still be served. An explicitly registered application route for `/robots.txt` takes precedence over the generated response.
+
+**Note:** Robots.txt is a crawler instruction, not an access-control mechanism. Protect private routes with server-side authorization rather than relying on crawler restrictions.
+
 ## IP Blocking
 
 You can block IPs from reaching the server. For example, in `defineConfig` inside `authtics_host.config.ts`:
