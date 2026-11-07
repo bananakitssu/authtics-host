@@ -237,9 +237,16 @@ function guardDatApiRequest(
         "Too many distinct invalid DAT values. DAT-protected endpoints are blocked for 24 hours.",
         Math.ceil(DAT_IP_BLOCK_MS / 1000),
       );
-    } else {
-      sendDatGuardResponse(res, 401, "INVALID_DAT", "DAT authorization failed.");
+      return false;
     }
+
+    // This endpoint deliberately reports a mismatch to its caller so the UI can
+    // determine whether the current DAT cookie is valid. Still count guesses.
+    if (pathname === "/__authtics_host_apis__/get-dat-matching") {
+      return true;
+    }
+
+    sendDatGuardResponse(res, 401, "INVALID_DAT", "DAT authorization failed.");
     return false;
   }
 
