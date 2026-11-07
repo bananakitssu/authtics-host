@@ -77,7 +77,9 @@ function fingerprint(value: string): string {
 }
 
 function clientIpForRateLimit(req: IncomingMessage): string {
-  return (req.ip || req.socket.remoteAddress || "unknown").trim();
+  // Forwarding headers are client-controlled unless a trusted proxy is configured.
+  // Use the TCP peer address so callers cannot evade limits by spoofing X-Forwarded-For.
+  return (req.socket.remoteAddress || "unknown").trim();
 }
 
 function persistDatLockouts(): void {
@@ -968,6 +970,10 @@ async function start() {
   const buildStyle: BuildStyle = requestedBuildStyle;
   setBuildStyle(buildStyle, process.cwd());
 
+  // Keep DAT lockouts alongside HostJS runtime data so they survive server restarts.
+  datLockoutFile = path.join(getBuildOutputRoot(), "security", "dat-lockouts.json");
+  loadDatLockouts();
+
   const PORT = config.port ?? 3000;
   const renderType = config.renderType ?? 'ssr';
   const showPanel = config.devMode !== false;
@@ -1113,6 +1119,11 @@ if (ua.includes("Windows NT")) {
     const safePath = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
     pathname = safePath;
     if (pathname !== "/" && pathname.endsWith("/")) pathname = pathname.slice(0, -1);
+
+    // Apply DAT validation and endpoint-specific rate limits before internal API handlers run.
+    if (method === "POST" && pathname.startsWith("/__authtics_host_apis__/")) {
+      if (!guardDatApiRequest(req, res, pathname)) return;
+    }
 
     /*if (pathname !== "/__authtics_host_apis__/ping" && pathname !== "/__authtics_host_apis__/get-connection" && pathname !== "/__authtics_hmr__" && pathname !== "/__authtics_host_apis__/get-file-by-pathname" && pathname !== "/__authtics_host_apis__/get-is-ssr" && pathname !== "/__authtics_host_apis__/get-compiler" && pathname !== "/__authtics_host_apis__/restart" && pathname !== "/__authtics_host_apis__/shutdown" && pathname !== "/__authtics_host_apis__/get-server-info" && pathname !== "/__authtics_host_apis__/get-cpu_memory") {
       totalRequests++;
