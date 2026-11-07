@@ -9,7 +9,7 @@ import url from "node:url";
 import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer, handleHTML } from "./renderEngine.js";
 import { getBuildOutputRoot, setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
 import { initializeSuperBuildOutput, refreshSuperRouteManifest } from "./superBuildOutput.js";
-import type { BuildStyle } from "./config.js";
+import type { BuildStyle, RobotsConfig } from "./config.js";
 import { createRobotsTxt } from "./robots.js";
 //import tls from 'tls';
 let config_: any = {};
@@ -989,7 +989,7 @@ async function start() {
   const compiler: CompilerType = /*config.compilerType === 'babel' ? 'babel' : */'esbuild';
   const hotReload: boolean = config.hotReload === true;
   const blockedIPs: string[] = config.blockedIPs;
-  const robotsConfig = config.robots as import("./config.js").RobotsConfig | undefined;
+  const robotsConfig = config.robots as RobotsConfig | undefined;
   const robotsTxt = robotsConfig && robotsConfig.enabled !== false
     ? createRobotsTxt(robotsConfig)
     : null;
