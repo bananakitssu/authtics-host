@@ -38,6 +38,7 @@ export interface AuthticsConfig {
    */
   patchForSsr?: boolean;
   patchForServer?: boolean;
+  blockedIPs?: string[];
 }
 
 export function defineConfig(config: AuthticsConfig): AuthticsConfig {
@@ -74,6 +75,8 @@ export function defineConfig(config: AuthticsConfig): AuthticsConfig {
     config.devMode = true
   if (config.hasPausedRoute == undefined)
     config.hasPausedRoute = false
+  if (config.blockedIPs == undefined)
+    config.blockedIPs = [];
 
   return config;
 }

@@ -1,7 +1,7 @@
 {
   "name": "@bananacool467/authtics-host",
   "version": "0.3.0",
-  "description": "Authtics Host, A Next.js-inspired web framework for Node.js and React with TypeScript and JSX support.",
+  "description": "Authtics Host, a Next.js-inspired web framework for Node.js and React with TypeScript and JSX support.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",

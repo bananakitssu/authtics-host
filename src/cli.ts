@@ -987,6 +987,7 @@ async function start() {
   const autoPaging = config.autoPage !== false;
   const compiler: CompilerType = /*config.compilerType === 'babel' ? 'babel' : */'esbuild';
   const hotReload: boolean = config.hotReload === true;
+  const blockedIPs: string[] = config.blockedIPs;
 
   const pagesDir = config.autoPage === true ? path.join(process.cwd(), config.autoPageDir || "") : undefined;
   const publicDir = config.autoFile === true ? path.join(process.cwd(), config.autoFileDir || "") : undefined;
@@ -1001,11 +1002,20 @@ async function start() {
     const { url = "/", method } = req;
     const actuallyShowPanel = showPanel/* && (config.dat != undefined ? (body.dat == config.dat || (Array.isArray(config.dat) && config.dat.includes(body.dat))) : true)*/
     req.ip = (
-  req.headers["x-real-ip"] as string ||
-  (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
-  req.socket.remoteAddress ||
-  undefined
-);
+      req.headers["x-real-ip"] as string ||
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
+      req.socket.remoteAddress ||
+      undefined
+    );
+    if (blockedIPs.includes(req.headers["x-real-ip"] as string ||
+                             (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
+                             req.socket.remoteAddress ||
+                             "unknown")) {
+      res.writeHead(403, { "content-type": "application/json" });
+      return res.end(JSON.stringify({
+        message: "request blocked"
+      }))
+    }
     req.ipType = req.ip?.includes(":") ? 6 : req.ip?.includes(".") ? 4 : 0;
     req.ua = req.headers["user-agent"] || undefined;
     let ua = req.headers["user-agent"] || "";

@@ -1,6 +1,6 @@
 # Authtics Host
 
-Version 0.2.9, License: MIT
+Version: 0.3.1, License: MIT
 
 Authtics Host is a Next.js-inspired web framework. Authtics Host supports SSR (Server-Side Rendering), SSG (Static Site Generation), CSR (Client-Side Rendering) and SRTWS (Site Rendering Through WebSockets) and uses **Esbuild**. This is not to be confused with auth platforms.
 
@@ -375,6 +375,17 @@ But if you have multiple DATs, then use:
 There isn't any limit of DATs you can add.
 
 **(Note: Adding your DAT will give you access to Restart and Shutdown and Pause/Resume Users and other features in the Developer Panel)**
+
+## IP Blocking
+
+You can block IPs from reaching the server. For example, in `defineConfig` inside `authtics_host.config.ts`:
+```ts
+blockedIPs: [
+  "127.0.0.1"
+]
+```
+
+This blocks the IP address: `"127.0.0.1"`. You can block more than 1 IP.
 
 ## HostJS commands
 
