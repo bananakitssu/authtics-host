@@ -156,6 +156,7 @@ strip.js
 .npmrc
 
 .replit
+.agents
 
 # HostJS Super build output
 .hostjs/

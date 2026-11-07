@@ -1,1 +1,0 @@
-- [Node child-process test cleanup](node-child-process-tests.md) — a signaled child can have `exitCode === null`; check `signalCode` too.
