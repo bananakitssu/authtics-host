@@ -9,6 +9,8 @@ import url from "node:url";
 import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer, handleHTML } from "./renderEngine.js";
 import { getBuildOutputRoot, setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
 import { initializeSuperBuildOutput, refreshSuperRouteManifest } from "./superBuildOutput.js";
+import type { RobotsConfig } from "./config.js";
+import { createRobotsTxt } from "./robots.js";
 import type { BuildStyle } from "./config.js";
 import {
   detectVPN,
@@ -1143,6 +1145,10 @@ async function start() {
   const compiler: CompilerType = /*config.compilerType === 'babel' ? 'babel' : */'esbuild';
   const hotReload: boolean = config.hotReload === true;
   const blockedIPs: string[] = config.blockedIPs;
+  const robotsConfig = config.robots as RobotsConfig | undefined;
+  const robotsTxt = robotsConfig && robotsConfig.enabled !== false
+    ? createRobotsTxt(robotsConfig)
+    : null;
   const vpnDetection = config.vpnDetection === true;
   const ipinfoToken = process.env.IPINFO_TOKEN;
 
@@ -1653,6 +1659,20 @@ if (typeof handler === 'string') {
         return res.end(JSON.stringify({
           message: "unhandled request"
         }))
+    }
+
+    // Serve the generated robots.txt before public-folder files.
+    // Registered application routes can still override this endpoint.
+    if (
+      robotsTxt !== null &&
+      pathname === "/robots.txt" &&
+      (method === "GET" || method === "HEAD")
+    ) {
+      res.writeHead(200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "public, max-age=3600",
+      });
+      return res.end(method === "HEAD" ? undefined : robotsTxt);
     }
 
     // ── 3. Public folder — serves files from /public ────────────────────────

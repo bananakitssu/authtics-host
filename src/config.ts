@@ -1,6 +1,19 @@
 export type BuildStyle = 'default' | 'super';
 export type BuildTrigger = 'default' | 'prebuilt';
 
+export interface RobotsConfig {
+  /** Generate /robots.txt when true. Defaults to true when this object is provided. */
+  enabled?: boolean;
+  /** One or more crawler user-agent names. Defaults to "*". */
+  userAgent?: string | string[];
+  /** URL paths crawlers are allowed to access. */
+  allow?: string[];
+  /** URL paths crawlers should not access. */
+  disallow?: string[];
+  /** Absolute HTTP(S) sitemap URL(s). */
+  sitemap?: string | string[];
+}
+
 export interface AuthticsConfig {
   port?: number;
   /**
@@ -39,6 +52,7 @@ export interface AuthticsConfig {
   patchForSsr?: boolean;
   patchForServer?: boolean;
   blockedIPs?: string[];
+  robots?: RobotsConfig;
   vpnDetection?: boolean;
 }
 
