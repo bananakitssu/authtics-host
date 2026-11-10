@@ -39,6 +39,7 @@ export interface AuthticsConfig {
   patchForSsr?: boolean;
   patchForServer?: boolean;
   blockedIPs?: string[];
+  vpnDetection?: boolean;
 }
 
 export function defineConfig(config: AuthticsConfig): AuthticsConfig {
@@ -77,6 +78,8 @@ export function defineConfig(config: AuthticsConfig): AuthticsConfig {
     config.hasPausedRoute = false
   if (config.blockedIPs == undefined)
     config.blockedIPs = [];
+  if (config.vpnDetection === undefined)
+    config.vpnDetection = false;
 
   return config;
 }

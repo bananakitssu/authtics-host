@@ -11,6 +11,13 @@ declare module "http" {
     bodySize: number;
     bodyType: string;
     sentTime: number;
+    vpnInfo?: {
+      isVPN: boolean | null;
+      isProxy: boolean | null;
+      isTor: boolean | null;
+      isRelay: boolean | null;
+      provider?: string;
+    };
   }
   interface ServerResponse {
     redirect: (url: string) => void;

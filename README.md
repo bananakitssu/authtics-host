@@ -1,6 +1,6 @@
 # Authtics Host
 
-Version: 0.3.1, License: MIT
+Version: 0.3.2, License: MIT
 
 Authtics Host is a Next.js-inspired web framework. Authtics Host supports SSR (Server-Side Rendering), SSG (Static Site Generation), CSR (Client-Side Rendering) and SRTWS (Site Rendering Through WebSockets) and uses **Esbuild**. This is not to be confused with auth platforms.
 
@@ -386,6 +386,27 @@ blockedIPs: [
 ```
 
 This blocks the IP address: `"127.0.0.1"`. You can block more than 1 IP.
+
+## VPN Detection
+
+Detect if the REQuest is using a VPN. Uses **IPinfo**.
+
+Example in `defineConfig` inside `authtics_host.config.ts`:
+```ts
+vpnDetection: true
+```
+
+It's included in `req.vpnInfo`, the format is:
+```ts
+vpnInfo?: {
+  isVPN: boolean | null;
+  isProxy: boolean | null;
+  isTor: boolean | null;
+  provider?: string;
+};
+```
+
+You'll need to create an API token on IPinfo first and save it to an environment variable named: `IPINFO_TOKEN`.
 
 ## HostJS commands
 

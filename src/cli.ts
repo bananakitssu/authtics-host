@@ -10,6 +10,37 @@ import { renderPage, CompilerType, handleSrtwsConnection, deleteSrtwsServer, han
 import { getBuildOutputRoot, setBuildStyle, tempFileForDev, tempFileForTsx } from "./rendererTempFiles.js";
 import { initializeSuperBuildOutput, refreshSuperRouteManifest } from "./superBuildOutput.js";
 import type { BuildStyle } from "./config.js";
+import {
+  detectVPN,
+  UNKNOWN_VPN_INFO
+} from "./vpnDetection.js";
+import { exec } from 'child_process';
+
+type Severity = 'critical' | 'high' | 'moderate' | 'low';
+
+interface AuditVulnerabilityDetails {
+  name: string;
+  severity: Severity | 'info';
+  isDirect: boolean;
+  via: unknown[];
+  effects: string[];
+  range: string;
+  nodes: string[];
+  fixAvailable: boolean | object;
+}
+
+interface AuditReport {
+  vulnerabilities?: Record<string, Omit<AuditVulnerabilityDetails, 'name'>>;
+}
+
+interface AuditFixResult {
+  success: boolean;
+  output: string;
+  warnings?: string;
+}
+
+type CategorizedVulnerabilities = Record<Severity, AuditVulnerabilityDetails[]>;
+
 //import tls from 'tls';
 let config_: any = {};
 let uptime = 0;
@@ -585,8 +616,132 @@ export default class App {
   
   constructor() {
     this.server = null;
+    this.registerAPIs();
     this.startServer();
-    this.post('/__authtics_host_apis__/set-users-paused', async (req, res) => {
+  }
+
+  async audit(): Promise<CategorizedVulnerabilities> {
+    return new Promise((resolve, reject) => {
+    exec('npm audit --json', { maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
+      if (error && !stdout) {
+        return reject(error);
+      }
+
+      let auditData: AuditReport;
+      try {
+        auditData = JSON.parse(stdout) as AuditReport;
+      } catch (parseErr) {
+        return reject(parseErr);
+      }
+
+      const vulnerabilities: CategorizedVulnerabilities = {
+        critical: [],
+        high: [],
+        moderate: [],
+        low: [],
+      };
+
+      const items = auditData.vulnerabilities ?? {};
+
+      for (const [pkgName, details] of Object.entries(items)) {
+        const severity = details.severity;
+        if (severity in vulnerabilities) {
+          vulnerabilities[severity as Severity].push({
+            name: pkgName,
+            ...details,
+          });
+        }
+      }
+
+      resolve(vulnerabilities);
+    });
+  });
+  }
+
+  async runAuditFix(
+    force: boolean = false
+  ): Promise<AuditFixResult> {
+  const command = force ? 'npm audit fix --force --json' : 'npm audit fix --json';
+
+  return new Promise((resolve, reject) => {
+    exec(
+      command,
+      {
+        maxBuffer: 1024 * 1024 * 10,
+      },
+      (error, stdout, stderr) => {
+        if (stdout) {
+          try {
+            const parsed = JSON.parse(stdout);
+            if (parsed.error) {
+              return reject(new Error(parsed.error.summary || 'npm audit fix failed'));
+            }
+            return resolve({
+              success: true,
+              output: stdout,
+              warnings: stderr || undefined,
+            });
+          } catch {
+            
+          }
+        }
+
+        if (error) {
+          return reject(error);
+        }
+
+        resolve({ success: true, output: stdout });
+      }
+    );
+  });
+  }
+
+  registerAPIs() {
+    this.post('/__authtics_host_apis__/audit-fix', async (req, res) => {
+      let datMatched = false;
+      if (config_.dat && config_.dat == req.dat) datMatched = true;
+      if (config_.dat && Array.isArray(config_.dat) && config_.dat.includes(req.dat)) datMatched = true;
+      if (datMatched) {
+        try {
+          const success = await this.runAuditFix(req.body.force || false);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(success));
+        } catch {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            message: "Internal server error."
+          }))
+        }
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
+      }
+    })
+    this.post('/__authtics_host_apis__/audit', async (req, res) => {
+      let datMatched = false;
+      if (config_.dat && config_.dat == req.dat) datMatched = true;
+      if (config_.dat && Array.isArray(config_.dat) && config_.dat.includes(req.dat)) datMatched = true;
+      if (datMatched) {
+        try {
+          const vulnerabilities = await this.audit();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(vulnerabilities));
+        } catch {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            message: "Internal server error."
+          }))
+        }
+      } else {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({
+          message: "unauthorized"
+        }))
+      }
+    })
+        this.post('/__authtics_host_apis__/set-users-paused', async (req, res) => {
       //const reqBody = (await getJsonBody(req)) as any;
       let datMatched = false;
       if (config_.dat && config_.dat == req.dat) datMatched = true;
@@ -988,6 +1143,14 @@ async function start() {
   const compiler: CompilerType = /*config.compilerType === 'babel' ? 'babel' : */'esbuild';
   const hotReload: boolean = config.hotReload === true;
   const blockedIPs: string[] = config.blockedIPs;
+  const vpnDetection = config.vpnDetection === true;
+  const ipinfoToken = process.env.IPINFO_TOKEN;
+
+  if (vpnDetection && !ipinfoToken) {
+    console.warn(
+      "[HostJS] VPN detection enabled, but IPINFO_TOKEN is missing."
+    );
+  }
 
   const pagesDir = config.autoPage === true ? path.join(process.cwd(), config.autoPageDir || "") : undefined;
   const publicDir = config.autoFile === true ? path.join(process.cwd(), config.autoFileDir || "") : undefined;

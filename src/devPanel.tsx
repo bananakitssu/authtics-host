@@ -1,5 +1,5 @@
 import React, { ReactNode, useState, useEffect, useRef, MouseEvent, useCallback } from 'react';
-import { ShieldCheck, Shield, CircleX, ChevronDown, ChevronUp, Bug, AlertTriangle, Info, ArrowLeft, Wifi, Terminal, Route, Globe, ChevronRight, ChevronLeft, Server, Cog, /*Search,*/ TriangleAlert, Eye, Zap, Power, Check as Tick, CheckCircle2, EyeOff, Copy, CopyCheck } from 'lucide-react';
+import { ShieldCheck, Shield, CircleX, ChevronDown, ChevronUp, Bug, AlertTriangle, Info, ArrowLeft, Wifi, Terminal, Route, Globe, ChevronRight, ChevronLeft, Server, Cog, /*Search,*/ TriangleAlert, Eye, Zap, Power, Check as Tick, CheckCircle2, EyeOff, Copy, CopyCheck, Link, CodeXml, Image, CircleQuestionMark } from 'lucide-react';
 import { devLoggerVerbose } from "./devLogger.js";
 import {
   TraceMap,
@@ -300,12 +300,14 @@ function Tab({
 }
 
 function TabBody({
-  children
+  children,
+  h
 }: {
-  children: ReactNode
+  children: ReactNode,
+  h?: boolean
 }) {
   return (
-    <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display:  'flex', flexDirection: 'column', gap: '8px' }}>
+    <div style={{ overflowY: 'auto', maxHeight: '240px', padding: '10px', display:  !h ? 'flex' : 'none', flexDirection: 'column', gap: '8px' }}>
       {children}
     </div>
   )
@@ -328,15 +330,17 @@ function TabData({
       justifyContent: 'space-between',
       padding: '6px 10px',
       background: '#fff',
-      borderRadius: '50px',
+      borderRadius: '20px',
       border: '1px solid #eee',
       fontSize: '12px',
       color: '#333',
+      overflowWrap: 'anywhere',
+      wordBreak: 'break-word',
     }}>
-      <span style={{ fontSize: '12px', color: titleColor ?? '#333' }}>
+      <span style={{ fontSize: '12px', color: titleColor ?? '#333', overflowWrap: 'anywhere', wordBreak: 'break-word', }}>
         {title}
       </span>
-      <span style={{ fontSize: '12px', color: contentColor ?? 'blue' }}>
+      <span style={{ fontSize: '12px', color: contentColor ?? 'blue', overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: '175px' }}>
         {content}
       </span>
     </div>
@@ -711,7 +715,7 @@ function Sparkline({ data, color, label, unit }: {
   const id = `grad-${label.replace(' ', '').toLowerCase()}`
 
   return (
-    <div style={{ background: '#fff', borderRadius: '8px', border: '1px solid #eee', padding: '8px 10px' }}>
+    <div style={{ background: '#fff', borderRadius: '20px', border: '1px solid #eee', padding: '8px 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
         <span style={{ fontSize: '10px', color: '#888' }}>{label}</span>
         <span style={{ fontSize: '11px', fontFamily: 'monospace', color }}>{latest}{unit}</span>
@@ -2604,8 +2608,8 @@ setHostName(window.location.hostname);
           {shutdown ? (<ShutdownTab />) : (<></>)}
 
           {consoleOpen && !shutdown ? (
-            <>
-              <div style={{
+            <Tab>
+              {/*<div style={{
                 padding: '6px 8px',
                 borderBottom: '1px solid #ddd',
                 background: '#fff',
@@ -2625,7 +2629,15 @@ setHostName(window.location.hostname);
                 <PanelButton onClick={() => setLogs([])} style={{ color: '#aaa', marginLeft: 'auto' }}>
                   Clear
                 </PanelButton>
-              </div>
+              </div>*/}
+              <TabHeader title="Console" icon={<Terminal size={12} color="#16a34a" />} onBack={() => { setConsoleOpen(false) }}>
+              <span style={{ fontSize: '10px', color: '#aaa', marginLeft: '2px' }}>
+                  {logs.length} log{logs.length !== 1 ? 's' : ''}
+                </span>
+                <PanelButton onClick={() => setLogs([])} style={{ color: '#aaa', marginLeft: 'auto' }}>
+                  Clear
+                </PanelButton>
+              </TabHeader>
 
               <div style={{
                 display: 'flex',
@@ -2855,11 +2867,11 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
     dangerouslySetInnerHTML={{ __html: Prism.highlight(code, Prism.languages.javascript, 'javascript') }}
   />
 )}</div>*/}
-            </>
+            </Tab>
 
           ) : networkOpen && !shutdown ? (
-            <>
-              <div style={{
+            <Tab>
+              {/*<div style={{
                 padding: '6px 8px',
                 borderBottom: '1px solid #ddd',
                 background: '#fff',
@@ -2873,10 +2885,13 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                 <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
                   <Wifi size={12} color="#3b82f6" /> Network
                 </span>
-              </div>
-              <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              </div>*/}
+              <TabHeader title="Network" icon={<Wifi size={12} color="#3b82f6" />} onBack={() => { setNetworkOpen(false) }} />
+              {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>*/}
+              <TabBody>
                 {/* Ping row */}
-                <div style={{
+                <TabData title="Ping" titleColor="#333" content={ping__ > 0 ? `${ping__}ms` : '??ms'} contentColor={ping__ < 100 ? '#16a34a' : ping__ < 300 ? '#d97706' : '#e53e3e'} />
+                {/*<div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   padding: '6px 10px',
@@ -2890,13 +2905,13 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                   <span style={{ color: ping__ < 100 ? '#16a34a' : ping__ < 300 ? '#d97706' : '#e53e3e', fontFamily: 'monospace' }}>
                     {ping__ > 0 ? `${ping__}ms` : '??ms'}
                   </span>
-                </div>
+                </div>*/}
                 {datRestrictionMissing ? (<span style={{ display: 'flex', opacity: 0.5, fontSize: 10, justifyContent: 'center', alignItems: 'center', gap: '8px' }}><Info size={30} />This analytic is unavaliable. Set "dat" to your current DAT in the Authtics Host config to set restriction and then restart.</span>) : (<></>)}
 
                 {/* Charts — update every 2s */}
                 <Sparkline data={receivedHistory} color="#3b82f6" label="Received" unit=" bytes" />
                 <Sparkline data={sentHistory}     color="#16a34a" label="Sent"     unit=" bytes" />
-                <Sparkline data={failedHistory}   color="#D70040" label="Failed"   unit=" count" />
+                <Sparkline data={failedHistory}   color="#D70040" label="Failed/dropped"   unit=" fetches" />
                 <span style={{fontSize: '15px', color: '#333', fontWeight: 'bold' }}>Fetches — {networkFetches.length} total fetches</span>
 
                 {/* Request log */}
@@ -2907,7 +2922,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                       background: '#fff',
                       display: 'flex',
                       flexDirection: 'column',
-                      borderRadius: '10px',
+                      borderRadius: '20px',
                       border: '1px solid #eee',
                       fontSize: '11px',
                       fontFamily: 'monospace',
@@ -2915,14 +2930,14 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                       wordBreak: 'break-word',
                     }}>
                       <div style={{display: 'flex',
-                      justifyContent: 'space-between', gap: '8px', padding: '6px 10px', borderBottom: '1px solid #eee'}}>
+                      justifyContent: 'space-between', gap: '8px', padding: '6px 10px', borderBottom: '1px solid #eee', margin: 10, borderRadius: '20px', background: '#f7f7f7'}}>
                       <span style={{ color: '#3b82f6' }}>{f.method}</span>
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#333' }}>{f.url}</span>
                       <span style={{ color: f.status ? (f.status < 400 ? '#16a34a' : '#e53e3e') : 'orange' }}>{f.status || "Awaiting for response..."}</span>
                     </div>
                       {f.method === "POST" && f.sent?.trim() ? (<div style={{padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: '8px'}}><p style={{color: 'orange', fontFamily: 'system-ui, sans-serif', margin: 0}}>Sent: </p><div>{f.sent}</div></div>) : (<></>)}
                       <div style={{padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: '8px'}}><p style={{color: 'green', fontFamily: 'system-ui, sans-serif', margin: 0}}>Received: </p><TruncatedText content={f.response || "..."} id={`${f.id}_fetch`} /></div>
-                      {f.response ? (f.response.split('').length > 100 ? (<PanelButton onClick2={(e: MouseEvent<HTMLDivElement>) => { const obj___ = document.getElementById(`${f.id}_fetch`);if (obj___ && !obj___.hasAttribute('expanded')) { obj___.innerText = f.response as string; obj___.setAttribute('expanded', ''); e.currentTarget.innerText = 'View less'; } else if (obj___ && obj___.hasAttribute('expanded')) { obj___.innerText = f.response?.slice(0, 100) + "..."; obj___.removeAttribute('expanded'); e.currentTarget.innerText = `View more (${f.response ? (f.response.split('').length - 100) : 0} bytes hidden)`; } }} style={{ padding: '8px 10px', borderRadius: '10px', background: '#34a8eb', color: '#fff', border: 'none', cursor: 'pointer', margin: '10px', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>View more ({f.response ? (f.response.split('').length - 100) : 0} bytes hidden)</PanelButton>) : (<></>)) : (<></>)}
+                      {f.response ? (f.response.split('').length > 100 ? (<PanelButton onClick2={(e: MouseEvent<HTMLDivElement>) => { const obj___ = document.getElementById(`${f.id}_fetch`);if (obj___ && !obj___.hasAttribute('expanded')) { obj___.innerText = f.response as string; obj___.setAttribute('expanded', ''); e.currentTarget.innerText = 'View less'; } else if (obj___ && obj___.hasAttribute('expanded')) { obj___.innerText = f.response?.slice(0, 100) + "..."; obj___.removeAttribute('expanded'); e.currentTarget.innerText = `View more (${f.response ? (f.response.split('').length - 100) : 0} bytes hidden)`; } }} style={{ padding: '8px 10px', borderRadius: '20px', background: '#34a8eb', color: '#fff', border: 'none', cursor: 'pointer', margin: '10px', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>View more ({f.response ? (f.response.split('').length - 100) : 0} bytes hidden)</PanelButton>) : (<></>)) : (<></>)}
                     </div>
                   ))}
                 <span style={{ fontSize: '15px', color: '#333', fontWeight: 'bold' }}>Active connections</span>
@@ -2932,7 +2947,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                     background: '#fff',
                     display: 'flex',
                     flexDirection: 'column',
-                    borderRadius: '10px',
+                    borderRadius: '20px',
                     border: '1px solid #eee',
                     fontSize: '11px',
                     fontFamily: 'monospace'
@@ -2951,7 +2966,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                     background: '#fff',
                     display: 'flex',
                     flexDirection: 'column',
-                    borderRadius: '10px',
+                    borderRadius: '20px',
                     border: '1px solid #eee',
                     fontSize: '11px',
                     fontFamily: 'monospace',
@@ -2959,18 +2974,18 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                   wordBreak: 'break-word',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '6px 10px' }}>
-                      <span style={{ color: '#3b82f6', display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>{r.type}</span>
-                      <span style={{ flex: 1, /*overflow: 'hidden',*/ /*textOverflow: 'ellipsis', whiteSpace: 'nowrap',*/ color: '#333' }}>{r.url}</span>
+                      <span style={{ color: '#3b82f6', display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>{r.type === "link" ? (<Link size={12} color="black" />) : r.type === "img" ? (<Image size={12} color="black" />) : r.type === "script" ? (<CodeXml size={12} color="black" />) : (<CircleQuestionMark size={12} color="black" />)} {r.type === "link" ? "Link" : r.type === "img" ? "Image" : r.type === "script" ? "Script" : "Unknown"}</span>
+                      <span style={{ flex: 1, /*overflow: 'hidden',*/ /*textOverflow: 'ellipsis', whiteSpace: 'nowrap',*/ color: '#333', maxWidth: '175px' }}>{r.url}</span>
                     </div>
                   </div>
               ))
                 }
-              </div>
-            </>
+              </TabBody>
+            </Tab>
 
           ) : routeOpen && !shutdown ? (
-      <>
-        <div style={{
+      <Tab>
+        {/*<div style={{
           padding: '6px 8px',
           borderBottom: '1px solid #ddd',
           background: '#fff',
@@ -2987,13 +3002,20 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           <span style={{ fontSize: '10px', color: '#aaa', marginLeft: '2px' }}>
             {pathName}
           </span>
-        </div>
+        </div>*/}
+        <TabHeader title="Route" icon={<Route size={12} color="#3b82f6" />} onBack={() => { setRouteOpen(false) }}>
+          <span style={{ fontSize: '10px', color: '#aaa', marginLeft: '2px' }}>{pathName}</span>
+        </TabHeader>
         {datRestrictionMissing ? (<SecuredTab />) : (<></>)}
-        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>
+        {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>*/}
+        <TabBody h={datRestrictionMissing}>
           <span style={{ fontSize: '24px', color: '#333', fontWeight: 'bold' }}>
             {pathName}
           </span>
-          <div style={{
+          <TabData title="Load Status Code" titleColor="#333" content={(status || 0).toString()} contentColor={status === 200 ? '#16a34a' : '#e53e3e'} />
+          <TabData title="File Path" titleColor="#333" content={path || "Unknown"} contentColor="blue" />
+          <TabData title="File Name" titleColor="#333" content={(path || "!").split('/').pop() || "!"} contentColor="blue" />
+          {/*<div style={{
             display: 'flex',
             justifyContent: 'space-between',
             padding: '6px 10px',
@@ -3044,12 +3066,12 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <span style={{ color: 'blue', fontFamily: 'monospace' }}>
               {path?.split('/').pop()}
             </span>
-          </div>
-        </div>
-      </>
+          </div>*/}
+        </TabBody>
+      </Tab>
     ) : webpageInfoOpen && !shutdown ? (
-      <>
-        <div style={{
+      <Tab>
+        {/*<div style={{
           padding: '6px 8px',
           borderBottom: '1px solid #ddd',
           background: '#fff',
@@ -3063,13 +3085,19 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
             <Globe size={12} color="#3b82f6" /> Webpage Info
           </span>
-        </div>
+        </div>*/}
+        <TabHeader title="Webpage Info" icon={<Globe size={12} color="#3b82f6" />} onBack={() => { setWebpageInfoOpen(false) }} />
         {datRestrictionMissing ? (<SecuredTab />) : (<></>)}
-        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>
+        {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>*/}
+        <TabBody h={datRestrictionMissing}>
           <span style={{fontSize: '12px', color: '#333' }}><span style={{ fontSize: '24px', color: '#333', fontWeight: 'bold' }}>
             {pathName}
           </span> on <span style={{fontSize: '12px', color: '#333', fontWeight: 'bold' }}>{hostName}</span></span>
-          <div style={{
+          <TabData title="Protocol" titleColor="#333" content={protocol || "Unknown"} contentColor="orange" />
+          <TabData title="SSL" titleColor="#333" content={protocol === 'HTTPS' ? 'Yes' : 'No'} contentColor={protocol === 'HTTPS' ? '#16a34a' : '#e53e3e'} />
+          <TabData title="Renderer Type" titleColor="#333" content={renderType === "ssr" ? 'SSR (Server-Side Rendering)' : renderType === "csr" ? 'CSR (Client-Side Rendering)' : renderType === "ssg" ? 'SSG (Static Site Generation)' : renderType === "srtws" ? "SRTWS (Site Rendering Through WebSockets)" : '???'} contentColor="blue" />
+          <TabData title="Compiler Type" titleColor="#333" content={compilerType} contentColor="blue" />
+          {/*<div style={{
             display: 'flex',
             justifyContent: 'space-between',
             padding: '6px 10px',
@@ -3136,12 +3164,12 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <span style={{ fontSize: '12px', color: 'blue' }}>
               {compilerType}
             </span>
-          </div>
-        </div>
-      </>
+          </div>*/}
+        </TabBody>
+      </Tab>
     ) : clientInfoOpen && !shutdown ? (
-      <>
-        <div style={{
+      <Tab>
+        {/*<div style={{
           padding: '6px 8px',
           borderBottom: '1px solid #ddd',
           background: '#fff',
@@ -3155,10 +3183,15 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
             <Info size={12} color="#3b82f6" /> Client Info
           </span>
-        </div>
+        </div>*/}
+        <TabHeader title="Client Info" icon={<Info size={12} color="#3b82f6" />} onBack={() => { setClientInfoOpen(false) }} />
         {datRestrictionMissing ? (<SecuredTab />) : (<></>)}
-        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>
-          <div style={{
+        {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>*/}
+        <TabBody h={datRestrictionMissing}>
+          <TabData title="HTTP Version" titleColor="#333" content={`v${httpVersion}`} contentColor="blue" />
+          <TabData title="User Agent" titleColor="#333" content={navigator.userAgent} contentColor="blue" />
+          <TabData title="OS" titleColor="#333" content={getOS()} contentColor="blue" />
+          {/*<div style={{
             display: 'flex',
             justifyContent: 'space-between',
             padding: '6px 10px',
@@ -3208,7 +3241,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <span style={{ fontSize: '12px', color: 'blue' }}>
               {getOS()}
             </span>
-          </div>
+          </div>*/}
           {/*<div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -3244,11 +3277,11 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             </span>
           </div>*/}
           <Sparkline data={fpsHistory} color={frames.current < 30 ? '#e53e3e' : frames.current < 60 ? '#d97706' : '#16a34a'} label="FPS" unit=" frames" />
-        </div>
-      </>
+        </TabBody>
+      </Tab>
     ) : panelCustomOpen && !shutdown ? (
-      <>
-           <div style={{
+      <Tab>
+        {/*<div style={{
              padding: '6px 8px',
             borderBottom: '1px solid #ddd',
             background: '#fff',
@@ -3262,8 +3295,10 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
               <Cog size={12} color="#3b82f6" /> Panel Customization
             </span>
-          </div>
-          <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display:  'flex', flexDirection: 'column', gap: '8px' }}>
+          </div>*/}
+        <TabHeader title="Panel Customization" icon={<Cog size={12} color="#3b82f6" />} onBack={() => { setPanelCustomOpen(false) }} />
+        {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display:  'flex', flexDirection: 'column', gap: '8px' }}>*/}
+        <TabBody>
             <span style={{ fontSize: '12px', color: '#333' }}>Colors</span>
             <div style={{
               display: 'flex',
@@ -3311,11 +3346,11 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                 {panelColor.background === '#3bb0ff' ? <Tick color="white" size={12}/> : <></>} <span style={{ fontSize: '12px', color: '#fff' }}>Blue</span>
               </div>
             </div>
-          </div>
-      </>
+        </TabBody>
+      </Tab>
     ) : aboutHostOpen && !shutdown ? (
-      <>
-        <div style={{
+      <Tab>
+        {/*<div style={{
           padding: '6px 8px',
           borderBottom: '1px solid #ddd',
           background: '#fff',
@@ -3329,9 +3364,11 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
             <ShieldCheck size={12} color="#f472b6" /> About Host
           </span>
-        </div>
+        </div>*/}
+        <TabHeader title="About Host" icon={<ShieldCheck size={12} color="#f472b6" />} onBack={() => { setAboutHostOpen(false) }} />
         {datRestrictionMissing ? (<SecuredTab />) : (<></>)}
-        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>
+        {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>*/}
+        <TabBody h={datRestrictionMissing}>
           <span style={{ fontSize: '24px', color: '#333', fontWeight: 'bold', textAlign: 'center', display: 'flex', alignItems: 'center', flexDirection: 'column', gap: '6px' }}>
             <ShieldCheck size={36} color="#f472b6" />
             Authtics Host
@@ -3339,7 +3376,9 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           <span style={{ fontSize: '12px', color: '#333', textAlign: 'center' }}>
             A lightweight, fast, and secure web framework for modern web applications.
           </span>
-          <div style={{
+        <TabData title="Version" titleColor="#333" content={`v${hostVersion}`} contentColor="blue" />
+        <TabData title="Made By" titleColor="#333" content={"bananakitssu ( bananacool467 )"} contentColor="blue" />
+        {/*<div style={{
             display: 'flex',
             justifyContent: 'space-between',
             padding: '6px 10px',
@@ -3372,7 +3411,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <span style={{ fontSize: '12px', color: 'orange' }}>
               bananakitssu ( bananacool467 )
             </span>
-          </div>
+          </div>*/}
           <a style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -3392,11 +3431,12 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               <ChevronRight size={12} />
             </span>
           </a>
-        </div>
-      </>
+        </TabBody>
+        {/*</div>*/}
+      </Tab>
     ) : serverInfoOpen && !shutdown ? (
-      <>
-        <div style={{
+      <Tab>
+        {/*<div style={{
           padding: '6px 8px',
           borderBottom: '1px solid #ddd',
           background: '#fff',
@@ -3408,12 +3448,17 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <ArrowLeft size={12} /> Back
           </PanelButton>
           <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
-            <Server size={12} color="#f472b6" /> Server Info
+            Server Info
           </span>
-        </div>
+        </div>*/}
+        <TabHeader title="Server Info" icon={<Server size={12} color="#f472b6" />} onBack={() => { setServerInfoOpen(false) }} />
         {datRestrictionMissing ? (<SecuredTab />) : (<></>)}
-        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>
-          <div style={{
+        {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>*/}
+        <TabBody h={datRestrictionMissing}>
+          <TabData title="Server uptime" titleColor="#333" content={uptime} contentColor="blue" />
+          <TabData title="Total requests" titleColor="#333" content={requests.toString()} contentColor="blue" />
+          <TabData title="Total current users" titleColor="#333" content={users.toString()} contentColor="blue" />
+          {/*<div style={{
             display: 'flex',
             justifyContent: 'space-between',
             padding: '6px 10px',
@@ -3463,14 +3508,15 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <span style={{ fontSize: '12px', color: 'blue' }}>
               {users}
             </span>
-          </div>
+          </div>*/}
           <Sparkline data={cpuUsageHistory} color="#3b82f6" label="CPU Usage" unit="" />
           <Sparkline data={heapUsageHistory} color="#3b82f6" label="Heap Used" unit={heapResult} />
-        </div>
-      </>
+          </TabBody>
+        {/*</div>*/}
+      </Tab>
     ) : packageSecurityOpen && !shutdown ? (
-      <>
-        <div style={{
+      <Tab>
+        {/*<div style={{
           padding: '6px 8px',
           borderBottom: '1px solid #ddd',
           background: '#fff',
@@ -3484,20 +3530,25 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
             <Shield size={12} color="#f472b6" /> Package Security
           </span>
-        </div>
-        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: /*(datRestrictionMissing ? 'none' : 'flex')*/'flex', flexDirection: 'column', gap: '8px' }}>
+        </div>*/}
+        <TabHeader title="Package Security" icon={<Shield size={12} color="#f472b6" />} onBack={() => { setPackageSecurityOpen(false) }} />
+        {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: /*(datRestrictionMissing ? 'none' : 'flex')*//*'flex', flexDirection: 'column', gap: '8px' }}>*/}
+        <TabBody>
             <ShieldCheck size={36} color="#f472b6" style={{ flexShrink: 0, marginTop: '20px' }} />
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#333', fontSize: 26, fontWeight: 'bold' }}>
               This feature is currently in BETA.
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#333', fontSize: 13 }}>
               The newest version of Authtics Host may have this feature completely implemented.
+
+              ( The backend's audit listing and fix functions are finished in this version. The frontend UI for it isn't finished yet. )
             </span>
-        </div>
-      </>
+        </TabBody>
+        {/*</div>*/}
+      </Tab>
     ) : settingsOpen && !shutdown ? (
-      <>
-        <div style={{
+      <Tab>
+        {/*<div style={{
           padding: '6px 8px',
           borderBottom: '1px solid #ddd',
           background: '#fff',
@@ -3511,16 +3562,19 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
             <Cog size={12} color="#f472b6" /> Settings
           </span>
-        </div>
-        <div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: /*(datRestrictionMissing ? 'none' : 'flex')*/'flex', flexDirection: 'column', gap: '8px' }}>
+        </div>*/}
+        <TabHeader title="Settings" icon={<Cog size={12} color="#f472b6" />} onBack={() => { setSettingsOpen(false) }}/>
+        {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: /*(datRestrictionMissing ? 'none' : 'flex')*//*'flex', flexDirection: 'column', gap: '8px' }}>*/}
+        <TabBody>
           <PanelButton onClick={() => setPanelCustomOpen(true)} fullWidth style={{ color: '#333', justifyContent: 'space-between', height: '32px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Cog size={12} color="#3b82f6" /> Panel Customization
                 </span>
                 <ChevronRight size={12} />
               </PanelButton>
-        </div>
-      </>
+        </TabBody>
+        {/*</div>*/}
+      </Tab>
     ) : !shutdown ? (
       <>
             <div style={{ padding: '8px', gap: '4px', display: 'flex', flexDirection: 'column' }}>
@@ -3636,7 +3690,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                 flexDirection: "column",
                 padding: '6px 10px',
                 background: '#fff',
-                borderRadius: '10px',
+                borderRadius: '20px',
                 border: '1px solid #eee',
                 fontSize: '12px',
                 color: '#333',
