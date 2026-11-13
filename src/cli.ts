@@ -1187,6 +1187,11 @@ async function start() {
         message: "request blocked"
       }))
     }
+    if (vpnDetection) {
+      req.vpnInfo = ipinfoToken
+        ? await detectVPN(req.ip ?? "", ipinfoToken)
+        : { ...UNKNOWN_VPN_INFO };
+    }
     req.ipType = req.ip?.includes(":") ? 6 : req.ip?.includes(".") ? 4 : 0;
     req.ua = req.headers["user-agent"] || undefined;
     let ua = req.headers["user-agent"] || "";

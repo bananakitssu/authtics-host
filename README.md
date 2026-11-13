@@ -1,6 +1,6 @@
 # Authtics Host
 
-Version: 0.3.2, License: MIT
+Version: 0.3.3, License: MIT
 
 Authtics Host is a Next.js-inspired web framework. Authtics Host supports SSR (Server-Side Rendering), SSG (Static Site Generation), CSR (Client-Side Rendering) and SRTWS (Site Rendering Through WebSockets) and uses **Esbuild**. This is not to be confused with auth platforms.
 
@@ -193,7 +193,7 @@ Then when you run your project, you will get a page just saying **"Hello, World!
 
 ![Developer Panel](assets/dev_panel.jpg)
 
-The Developer Panel is what you could use to help you debug your code. The Developer Panel has **8 tabs**:
+The Developer Panel is what you could use to help you debug your code. The Developer Panel has **9 tabs**:
 
 * **Console** — Shows current logs.
 * **Route** — Shows information about the current route.
@@ -203,11 +203,11 @@ The Developer Panel is what you could use to help you debug your code. The Devel
 * **About Host** — Shows the current version of *Authtics Host*.
 * **Server Info** — Shows how much heap was used and how much CPU was used on the server and how much requests there were and how much users are currently on the site and how long the site has been up.
 * **Settings** — Customize the dev panel.
-* **Package Security** — It's under-development so it's not usable in this current version.
+* **Package Security** — Check for dependency vulnerabilities and fix them.
 
 The information the Developer Panel shows outside of the tabs is just your **DAT** (Developer Access Token), with a **Copy** button.
 
-**(Note: If you do not set DAT restriction (Which will be explained on how to set it up in the next section), you will only get access to the Console and Network tabs)**
+**(Note: If you do not set DAT restriction (Which will be explained on how to set it up in the next section), you will only get access to the Console, Network and Settings tabs)**
 
 The Developer Panel also have remote buttons:
 
@@ -444,6 +444,18 @@ vpnInfo?: {
 ```
 
 You'll need to create an API token on IPinfo first and save it to an environment variable named: `IPINFO_TOKEN`.
+
+## Build fallbacks
+
+If a newer build fails, normally it would return an error to the client until you fix the issue.
+You can make Authtics Host fallback to a successful build when that happens.
+
+In `authtics_host.config.ts`, you can add:
+```ts
+"dontStopOnFailed": true
+```
+
+If there's a build error, it will fallback to a successful build and write to a file to show all errors. For example if your page file is at `client/pages/index.tsx`, the errors will be saved at `client/pages/index.tsx.errors.txt` if `"dontStopOnFailed"` is on.
 
 ## HostJS commands
 
