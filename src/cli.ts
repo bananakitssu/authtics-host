@@ -1143,6 +1143,7 @@ async function start() {
   const showPanel = config.devMode !== false;
   const autoPaging = config.autoPage !== false;
   const compiler: CompilerType = /*config.compilerType === 'babel' ? 'babel' : */'esbuild';
+  const prebuildOnly = config.buildTrigger === "prebuild";
   const hotReload: boolean = config.hotReload === true;
   const blockedIPs: string[] = config.blockedIPs;
   const robotsConfig = config.robots as RobotsConfig | undefined;
@@ -1150,6 +1151,7 @@ async function start() {
     ? createRobotsTxt(robotsConfig)
     : null;
   const vpnDetection = config.vpnDetection === true;
+  const dontStopOnFailed = config.dontStopOnFailed;
   const ipinfoToken = process.env.IPINFO_TOKEN;
 
   if (vpnDetection && !ipinfoToken) {
@@ -1385,7 +1387,7 @@ if (ua.includes("Windows NT")) {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
               html = html.replace("<script>", "<script>\nwindow.__paused__ = true;")
               //console.log("has paused: %s", html.includes("__paused__"))
         res.setHeader("Content-Type", "text/html");
@@ -1411,7 +1413,7 @@ if (ua.includes("Windows NT")) {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
               html = html.replace("<script>", "<script>\nwindow.__paused__ = true;")
               //console.log("has paused: %s", html.includes("__paused__"))
         res.setHeader("Content-Type", "text/html");
@@ -1444,7 +1446,7 @@ if (ua.includes("Windows NT")) {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
               html = html.replace("<script>", "<script>\nwindow.__paused__ = true;")
               //console.log("has paused: %s", html.includes("__paused__"))
         res.setHeader("Content-Type", "text/html");
@@ -1470,7 +1472,7 @@ if (ua.includes("Windows NT")) {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
               html = html.replace("<script>", "<script>\nwindow.__paused__ = true;")
               //console.log("has paused: %s", html.includes("__paused__"))
         res.setHeader("Content-Type", "text/html");
@@ -1555,7 +1557,7 @@ if (typeof handler === 'string') {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
               html = html.replace("<script>", "<script>\nwindow.__paused__ = true;")
               //console.log("has paused: %s", html.includes("__paused__"))
         res.setHeader("Content-Type", "text/html");
@@ -1581,7 +1583,7 @@ if (typeof handler === 'string') {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
               html = html.replace("<script>", "<script>\nwindow.__paused__ = true;")
               //console.log("has paused: %s", html.includes("__paused__"))
         res.setHeader("Content-Type", "text/html");
@@ -1614,7 +1616,7 @@ if (typeof handler === 'string') {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
               html = html.replace("<script>", "<script>\nwindow.__paused__ = true;")
               //console.log("has paused: %s", html.includes("__paused__"))
         res.setHeader("Content-Type", "text/html");
@@ -1640,7 +1642,7 @@ if (typeof handler === 'string') {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
               html = html.replace("<script>", "<script>\nwindow.__paused__ = true;")
               //console.log("has paused: %s", html.includes("__paused__"))
         res.setHeader("Content-Type", "text/html");
@@ -1729,7 +1731,7 @@ if (typeof handler === 'string') {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
         res.setHeader("Content-Type", "text/html");
         res.writeHead(404);
         html = html.replace("<script>", "<script>\nwindow.__status_code__ = 404;");
@@ -1772,7 +1774,7 @@ if (typeof handler === 'string') {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
         res.setHeader("Content-Type", "text/html");
         return res.end(html);
       } catch (e: any) {
@@ -1810,7 +1812,7 @@ if (typeof handler === 'string') {
             );
             res.end(f);
           })
-          }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+          }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
           res.setHeader("Content-Type", "text/html");
           return res.end(html);
         } catch (e: any) {
@@ -1833,7 +1835,7 @@ if (typeof handler === 'string') {
             );
             res.end(f);
           })
-        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForSsr);
+        }, (p) => { routes.delete(`GET:${p}`) }, req.cookies.dat, config_.dat, config_.renderType, config_.patchForServer, prebuildOnly, dontStopOnFailed);
         res.setHeader("Content-Type", "text/html");
         res.writeHead(404);
         html = html.replace("<script>", "<script>\nwindow.__status_code__ = 404;");

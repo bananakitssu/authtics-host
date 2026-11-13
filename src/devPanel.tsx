@@ -12,7 +12,7 @@ import 'prismjs/components/prism-javascript';
 (Prism.languages.javascript as any)['builtin'] = /\b(window|document|console|navigator|localStorage|sessionStorage|fetch|Promise|setTimeout|setInterval|clearTimeout|clearInterval|requestAnimationFrame|Math|JSON|Object|Array|String|Number|Boolean|Date|RegExp|Error|Map|Set|Symbol|Proxy|Reflect|performance|history|location|screen|crypto|indexedDB|alert|confirm|prompt)\b/;*/
 //const isMobile = true;
 
-let pT: any, rT: any, sT: any;
+let pT: any, rT: any, sT: any, aDT: any, aFDT: any;
 
 const ANSI_COLORS: Record<number, string> = {
   30: "#000000",
@@ -401,6 +401,12 @@ async function increaseDots(dots: number, setter: Function, type: number): Promi
         if (type == 3) {
           if (sT == null) r(0);
         }
+        if (type == 4) {
+          if (aDT == null) r(0);
+        }
+        if (type == 5) {
+          if (aFDT == null) r(0);
+        }
         if (dots == 0) r(0);
         let newDots = dots;
         if (dots < 6) newDots++;
@@ -410,6 +416,8 @@ async function increaseDots(dots: number, setter: Function, type: number): Promi
     if (type === 1) pT = t;
     if (type === 2) rT = t;
     if (type === 3) sT = t;
+    if (type === 4) aDT = t;
+    if (type === 5) aFDT = t;
     setter(t);
   });
 }
@@ -489,7 +497,7 @@ export async function mapGeneratedLocation(
       ignoredFetches.splice(addedIndex, 1);
 
       if (!mapResponse.ok) {
-        console.warn("[HostJS] Could not load source map:", mapUrl.href);
+        console.debug(`[HostJS \x1b[33mWarn\x1b[0m]: \x1b[33m${mapUrl.href}\x1b[0m`);
         return location;
       }
 
@@ -706,11 +714,31 @@ function Sparkline({ data, color, label, unit }: {
 }) {
   const W = 280, H = 48;
   const max = Math.max(...data, 1);
-  const points = data.map((v, i) => {
+  /*const points = data.map((v, i) => {
     const x = (i / (data.length - 1)) * W;
     const y = H - (v / max) * (H - 4) - 2;
     return `${x},${y}`;
-  }).join(' ');
+  }).join(' ');*/
+    const coords = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * W,
+    y: H - (v / max) * (H - 4) - 2,
+  }));
+
+  // Generates a smooth SVG path string through all coordinates
+  const smoothPath = coords.reduce((acc, pt, i, arr) => {
+    if (i === 0) return `M ${pt.x},${pt.y}`;
+    const prev = arr[i - 1];
+    const next = arr[i + 1] || pt;
+    const prev2 = arr[i - 2] || prev;
+
+    // Control points (adjust '0.2' for more or less curve tension)
+    const cp1x = prev.x + (pt.x - prev2.x) * 0.2;
+    const cp1y = prev.y + (pt.y - prev2.y) * 0.2;
+    const cp2x = pt.x - (next.x - prev.x) * 0.2;
+    const cp2y = pt.y - (next.y - prev.y) * 0.2;
+
+    return `${acc} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${pt.x},${pt.y}`;
+  }, '');
   const latest = data[data.length - 1] ?? 0;
   const id = `grad-${label.replace(' ', '').toLowerCase()}`
 
@@ -730,7 +758,7 @@ function Sparkline({ data, color, label, unit }: {
         </defs>
         {data.length > 1 && (
           <>
-            <polygon
+            {/*<polygon
               points={`0,${H} ${points} ${W},${H}`}
               fill={`url(#${id})`}
             />
@@ -742,16 +770,69 @@ function Sparkline({ data, color, label, unit }: {
               strokeLinejoin="round"
               strokeLinecap="round"
             />
-            {/* Latest value dot */}
+            {/* Latest value dot *//*}
             {(() => {
               const last = points.split(' ').pop()!.split(',');
               return <circle cx={last[0]} cy={last[1]} r="2.5" fill={color} />;
-            })()}
+            })()}*/}
+                        <path
+              d={`${smoothPath} L ${W},${H} L 0,${H} Z`}
+              fill={`url(#${id})`}
+            />
+            <path
+              d={smoothPath}
+              fill="none"
+              stroke={color}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            {/* Latest value dot */}
+            <circle
+              cx={coords[coords.length - 1].x}
+              cy={coords[coords.length - 1].y}
+              r="2.5"
+              fill={color}
+            />
           </>
         )}
       </svg>
     </div>
   );
+}
+
+async function fetchPackageAudits () {
+  const f = await fetch("/__authtics_host_apis__/audit", {
+    method: 'POST'
+  });
+  if (f.status === 200) {
+    const json = await f.json();
+    return json;
+  } else {
+    return false;
+  }
+}
+
+async function audit ( force: boolean, callback: Function ) {
+  const f = await fetch("/__authtics_host_apis__/audit-fix", {
+    method: 'POST',
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      force
+    })
+  });
+  if (f.status === 200) {
+    const json = await f.json();
+    if (json.success) {
+      await callback();
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
 }
 
 function installNetworkInterceptor(
@@ -1225,6 +1306,19 @@ const generateToken = (): string => {
   return crypto.randomUUID().replace(/-/g, '').substring(0, 16);
 }
 
+type Severity = 'critical' | 'high' | 'moderate' | 'low';
+
+interface AuditVulnerabilityDetails {
+  name: string;
+  severity: Severity | 'info';
+  isDirect: boolean;
+  via: unknown[];
+  effects: string[];
+  range: string;
+  nodes: string[];
+  fixAvailable: boolean | object;
+}
+
 export default function DevPanel() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [open, setOpen] = useState(false);
@@ -1245,24 +1339,11 @@ export default function DevPanel() {
   const [restarting, setRestarting] = useState<number>(0);
   const [pausing, setPausing] = useState<number>(0);
   const [packageSecurityOpen, setPackageSecurityOpen] = useState(false);
-  const [highRiskDeps, setHighRiskDeps] = useState<{
-    suggestion: 'uninstall' | 'upgrade' | 'downgrade';
-    package: string;
-    ver: string;
-    recommendedVer: string
-  }[]>([]);
-  const [mediumRiskDeps, setMediumRiskDeps] = useState<{
-    suggestion: 'uninstall' | 'upgrade' | 'downgrade';
-    package: string;
-    ver: string;
-    recommendedVer: string
-  }[]>([]);
-  const [lowRiskDeps, setLowRiskDeps] = useState<{
-    suggestion: 'uninstall' | 'upgrade' | 'downgrade';
-    package: string;
-    ver: string;
-    recommendedVer: string
-  }[]>([]);
+  const [criticalRiskDeps, setCriticalRiskDeps] = useState<AuditVulnerabilityDetails[]>([]);
+  const [highRiskDeps, setHighRiskDeps] = useState<AuditVulnerabilityDetails[]>([]);
+  const [mediumRiskDeps, setMediumRiskDeps] = useState<AuditVulnerabilityDetails[]>([]);
+  const [lowRiskDeps, setLowRiskDeps] = useState<AuditVulnerabilityDetails[]>([]);
+  const [vulnerabilitiesLoading, setVulnerabilitiesLoading] = useState(true);
   const [panelColor, setPanelColor] = useState<{
     background: string;
     border: string;
@@ -1338,6 +1419,12 @@ const [notificationSleepingUntil, setNotificationSleepingUntil] =
   const [shuttingDownTimeout, setShuttingDownTimeout] =  useState<ReturnType<typeof setTimeout>>();
   const [restartingTimeout, setRestartingTimeout] =  useState<ReturnType<typeof setTimeout>>();
   const [pausingTimeout, setPausingTimeout] =  useState<ReturnType<typeof setTimeout>>();
+  const [auditingForcefullyDotsTimeout, setAuditingForcefullyTimeout] = useState<ReturnType<typeof setTimeout>>();
+  const [auditingDotsTimeout, setAuditingTimeout] = useState<ReturnType<typeof setTimeout>>();
+  const [auditing, setAuditing] = useState(false);
+  const [auditingForcefully, setAuditingForcefully] = useState(false);
+  const [auditingForcefullyDots, setAuditingForcefullyDots] = useState(0);
+  const [auditingDots, setAuditingDots] = useState(0);
 /*const [pos, setPos] = React.useState({ x: 20, y: 20 });
 const [dragging, setDragging] = React.useState(false);
 const offset = React.useRef({ x: 0, y: 0 });
@@ -1413,15 +1500,25 @@ const [rootEl, setRootEl] = useState<Element | null>(null);*/
       clearTimeout(sT);
       sT = null;
     }
+    if (auditingDots == 0) {
+      clearTimeout(auditingDotsTimeout);
+      clearTimeout(aDT);
+    }
+    if (auditingForcefullyDots == 0) {
+      clearTimeout(auditingForcefullyDotsTimeout);
+      clearTimeout(aFDT);
+    }
     
     async function run () {
       if (pausing != 0) setPausing(await increaseDots(pausing, setPausingTimeout, 1));
       if (restarting != 0) setRestarting(await increaseDots(restarting, setRestartingTimeout, 2));
       if (shuttingDown != 0) setShuttingDown(await increaseDots(shuttingDown, setShuttingDownTimeout, 3));
+      if (auditingDots != 0) setAuditingDots(await increaseDots(auditingDots, setAuditingTimeout, 4));
+      if (auditingForcefullyDots != 0) setAuditingForcefullyDots(await increaseDots(auditingForcefullyDots, setAuditingForcefullyTimeout, 5));
     }
     
     run();
-  }, [pausing, restarting, shuttingDown]);
+  }, [pausing, restarting, shuttingDown, auditingDots, auditingForcefullyDots]);
 
 /*useEffect(() => {
   setRootEl(doc?.documentElement as HTMLElement);
@@ -1869,6 +1966,14 @@ useEffect(() => {
           update();
           getUsage();
         }, 500);
+        setInterval(async () => {
+          const v = await fetchPackageAudits();
+          setLowRiskDeps(v.low);
+          setMediumRiskDeps(v.medium || v.moderate);
+          setHighRiskDeps(v.high);
+          setCriticalRiskDeps(v.critical);
+          setVulnerabilitiesLoading(false);
+        }, 1000)
       }
       }, 250);
     }, 250);
@@ -2589,21 +2694,24 @@ setHostName(window.location.hostname);
         maxHeight: drawerHeight,
         opacity: open ? 1 : 0,
         pointerEvents: open ? 'auto' : 'none',
-        borderRadius: '10px',
+        borderRadius: '20px',
         transition: 'max-height 0.35s ease, opacity 0.25s ease',
         border: '1px solid #e6e3e3',
         overflow: (!consoleOpen && !packageSecurityOpen && !settingsOpen && !panelCustomOpen && !serverInfoOpen && !routeOpen && !networkOpen && !aboutHostOpen && !webpageInfoOpen && !clientInfoOpen ? 'hidden auto' : 'hidden'),
       }}>
         <div style={{
-          background: '#f7f7f7',
+          //background: '#f7f7f7',
           //border: '1px solid #e6e3e3',
-          borderRadius: '10px',
+          borderRadius: '20px',
           width: '320px',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
           boxSizing: 'border-box',
           overflow: 'hidden',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          backgroundColor: 'rgba(247, 247, 247, 0.9)',
         }}>
           {shutdown ? (<ShutdownTab />) : (<></>)}
 
@@ -3365,7 +3473,7 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <ShieldCheck size={12} color="#f472b6" /> About Host
           </span>
         </div>*/}
-        <TabHeader title="About Host" icon={<ShieldCheck size={12} color="#f472b6" />} onBack={() => { setAboutHostOpen(false) }} />
+        <TabHeader title="About HostJS" icon={<ShieldCheck size={12} color="#f472b6" />} onBack={() => { setAboutHostOpen(false) }} />
         {datRestrictionMissing ? (<SecuredTab />) : (<></>)}
         {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: (datRestrictionMissing ? 'none' : 'flex'), flexDirection: 'column', gap: '8px' }}>*/}
         <TabBody h={datRestrictionMissing}>
@@ -3532,9 +3640,90 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
           </span>
         </div>*/}
         <TabHeader title="Package Security" icon={<Shield size={12} color="#f472b6" />} onBack={() => { setPackageSecurityOpen(false) }} />
+        {datRestrictionMissing ? (<SecuredTab />) : (<></>)}
         {/*<div style={{ overflowY: 'auto', maxHeight: '260px', padding: '10px', display: /*(datRestrictionMissing ? 'none' : 'flex')*//*'flex', flexDirection: 'column', gap: '8px' }}>*/}
-        <TabBody>
-            <ShieldCheck size={36} color="#f472b6" style={{ flexShrink: 0, marginTop: '20px' }} />
+        <TabBody h={datRestrictionMissing}>
+          <div style={{
+        marginBottom: '5px',
+        gap: '8px',
+        flexDirection: 'row',
+        display: 'flex',
+        right: '5px'
+          }}>
+            <PanelButton onClick={() => {setAuditing(true);setAuditingDots(1);audit(false, async () => {
+        const v = await fetchPackageAudits();
+        setLowRiskDeps(v.low);
+        setMediumRiskDeps(v.medium || v.moderate);
+        setHighRiskDeps(v.high);
+        setCriticalRiskDeps(v.critical);
+        setAuditing(false);
+        setAuditingDots(0);
+      })}}background="#0294e8" style={{ color: "#ffffff" }}><pre>{auditingDots ? String(finalizeDots("Auditing", auditingDots)) : "Run audit"}</pre></PanelButton>
+            <PanelButton background="#ffffff" style={{ color: "#333", border: '1px solid #333'}} onClick={() => {setAuditingForcefully(true);setAuditingForcefullyDots(1);audit(true, async () => {
+        const v = await fetchPackageAudits();
+        setLowRiskDeps(v.low);
+        setMediumRiskDeps(v.medium || v.moderate);
+        setHighRiskDeps(v.high);
+        setCriticalRiskDeps(v.critical);
+        setAuditingForcefully(false);
+        setAuditingForcefullyDots(0);
+            })}}><pre>{auditingForcefullyDots ? String(finalizeDots("Auditing forcefully", auditingForcefullyDots)) : "Run audit forcefully"}</pre></PanelButton>
+          </div>
+          <span style={{fontSize: '15px', color: '#333', fontWeight: 'bold' }}>Vulnerabilities — {criticalRiskDeps.length} critical, {highRiskDeps.length} high, {mediumRiskDeps.length} medium/moderate and {lowRiskDeps.length} low</span>
+          {vulnerabilitiesLoading && (
+        <span style={{fontSize: '15px', color: '#333'}}>Loading...</span>
+          )}
+          {[...lowRiskDeps, ...mediumRiskDeps, ...highRiskDeps, ...criticalRiskDeps].map((risk, id) => (
+        <div key={id}>
+          <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      padding: '6px 10px',
+      background: '#fff',
+      borderRadius: '20px',
+      border: '1px solid #eee',
+      fontSize: '12px',
+      color: '#333',
+      overflowWrap: 'anywhere',
+      wordBreak: 'break-word',
+          gap: '8px'
+    }}>
+            <div style={{
+          justifyContent: 'space-between',
+          display: 'flex'
+            }}>
+      <span style={{ fontSize: '12px', color: "#333", overflowWrap: 'anywhere', wordBreak: 'break-word', }}>
+        {risk.name}
+      </span>
+      <span style={{ fontSize: '12px', color: risk.severity === "low" ? "#6e6e6e" : risk.severity === "moderate" ? "#e6b907" : risk.severity === "high" ? "#e67607" : risk.severity === "critical" ? "#e6078c" : "#333", overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: '175px' }}>
+        {risk.severity.charAt(0).toUpperCase() + risk.severity.slice(1)}
+      </span>
+            </div>
+            <span style={{
+          fontSize: '12px', color: "#bfbfbf", overflowWrap: 'anywhere', wordBreak: 'break-word',
+            }}>Installed by another package: {!risk.isDirect ? "Yes" : "No ( Inside your package.json )"}</span>
+            <span style={{
+          fontSize: '12px', color: "#bfbfbf", overflowWrap: 'anywhere', wordBreak: 'break-word',
+            }}>Packages depending on this: {risk.effects.length != 0 ? new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(risk.effects) : "None"}</span>
+            <span style={{
+          fontSize: '12px', color: "#bfbfbf", overflowWrap: 'anywhere', wordBreak: 'break-word',
+            }}>Version range: {risk.range}</span>
+            <span style={{
+          fontSize: '12px', color: "#bfbfbf", overflowWrap: 'anywhere', wordBreak: 'break-word',
+            }}>Fix avaliable: {risk.fixAvailable ? "Yes" : "No"}</span>
+            <span style={{ fontSize: '14px', color: "#333", overflowWrap: 'anywhere', wordBreak: 'break-word', }}>Vulnerability details</span>
+            {risk.via.map((viaRisk, id) => (
+          <span key={id} style={{
+          fontSize: '12px', color: "#333", overflowWrap: 'anywhere', wordBreak: 'break-word', padding: '10px 10px', borderRadius: '20px', backgroundColor: '#f0f0f0', border: '1px solid #eee', display: 'flex', flexDirection: 'column'
+            }}>{typeof viaRisk != "string" ? (<><span><strong style={{ fontWeight: 'bold' }}>Title</strong>: {(viaRisk as any).title}</span>
+                                              <span><strong style={{ fontWeight: 'bold' }}>URL</strong>: <a href={(viaRisk as any).url}>{(viaRisk as any).url}</a></span>
+              <span><strong style={{ fontWeight: 'bold' }}>CWE</strong>: {new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format((viaRisk as any).cwe) || (viaRisk as any).cwe}</span></>) : `Relies on: ${(viaRisk as any)}`}
+                                              </span>
+            ))}
+    </div>
+        </div>
+          ))}
+          {/*<ShieldCheck size={36} color="#f472b6" style={{ flexShrink: 0, marginTop: '20px' }} />
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#333', fontSize: 26, fontWeight: 'bold' }}>
               This feature is currently in BETA.
             </span>
@@ -3542,7 +3731,10 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
               The newest version of Authtics Host may have this feature completely implemented.
 
               ( The backend's audit listing and fix functions are finished in this version. The frontend UI for it isn't finished yet. )
-            </span>
+            </span>*/}
+          <span style={{
+          fontSize: '12px', opacity: 0.5, overflowWrap: 'anywhere', wordBreak: 'break-word', gap: '4px', alignItems: 'center', textAlign: 'center'
+            }}><Info size={12} /> These reports come from NPM's audit command.</span>
         </TabBody>
         {/*</div>*/}
       </Tab>
@@ -3614,8 +3806,13 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Shield size={12} color="#f472b6" /> Package Security
                 </span>
+                <div style={{
+        gap: '8px',
+        display: 'flex',
+        flexDirection: 'row'
+                }}>
                 {
-                  highRiskDeps.length > 0 ?
+                  highRiskDeps.length > 0 &&
                   (
                     <div style={{ gap: '4px', alignItems: 'center', justifyContent: 'center', display: 'flex' }}>
                       <TriangleAlert size={12} color="red" />
@@ -3623,7 +3820,18 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                         {highRiskDeps.length}
                       </span>
                     </div>
-                  ) : mediumRiskDeps.length > 0 ?
+                  )
+                } {
+                  criticalRiskDeps.length > 0 &&
+                  (
+                    <div style={{ gap: '4px', alignItems: 'center', justifyContent: 'center', display: 'flex' }}>
+                      <TriangleAlert size={12} color="purple" />
+                      <span style={{ color: '#111', borderRadius: '100px', padding: '1px 6px', fontSize: '10px' }}>
+                        {criticalRiskDeps.length}
+                      </span>
+                    </div>
+                  )
+                } {mediumRiskDeps.length > 0 &&
                   (
                     <div style={{ gap: '8px', alignItems: 'center', justifyContent: 'center', display: 'flex' }}>
                       <TriangleAlert size={12} color="#f7c623" />
@@ -3631,7 +3839,8 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                         {mediumRiskDeps.length}
                       </span>
                     </div>
-                  ) : lowRiskDeps.length > 0 ?
+                  )
+                } {lowRiskDeps.length > 0 &&
                   (
                     <div style={{ gap: '8px', alignItems: 'center', justifyContent: 'center', display: 'flex' }}>
                       <Info size={12} color="#3bb0ff" />
@@ -3639,8 +3848,9 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
                         {lowRiskDeps.length}
                       </span>
                     </div>
-                  ) : <CheckCircle2 size={12} color="#16a34a" />
-                }
+                  )
+                } {(highRiskDeps.length === 0 && lowRiskDeps.length === 0 && mediumRiskDeps.length === 0 && criticalRiskDeps.length === 0) && (datRestrictionMissing ? <TriangleAlert size={12} color="orange" /> : <CheckCircle2 size={12} color="#16a34a" />)}
+                </div>
               </PanelButton>
               <PanelButton onClick={() => setNetworkOpen(true)} fullWidth style={{ color: '#333', justifyContent: 'space-between', height: '32px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -3679,12 +3889,14 @@ window.addEventListener("unhandledrejection", evalUnhandledRejection);const save
             <div style={{
               padding: '6px 8px',
               borderTop: '1px solid #ddd',
-              background: '#fff',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
               display: 'flex',
               gap: '6px',
               overflowY: 'auto',
               //maxHeight: '260px',
               flexDirection: 'column',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
             }}>
               <div style={{
                 flexDirection: "column",

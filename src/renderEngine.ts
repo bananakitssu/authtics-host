@@ -65,7 +65,7 @@ export function handleSrtwsConnection(
 
     const renderAndSend = async () => {
       //const pageHtml = renderToString(React.createElement(PageComponent/*, state*/));
-      const pageHtml = await renderPage(tsxPath, reqUrl, config.devMode, config.compilerType, config.hotReload, config.autoPage, config.autoPageDir, config.appDir, fileHandler, rmvFileHandler, reqDAT, config.dat, 'csr', config.patchForSsr);
+      const pageHtml = await renderPage(tsxPath, reqUrl, config.devMode, config.compilerType, config.hotReload, config.autoPage, config.autoPageDir, config.appDir, fileHandler, rmvFileHandler, reqDAT, config.dat, 'csr', config.patchForServer, config.dontStopOnFailed);
       ws.send(JSON.stringify({ type: "DOM", html: pageHtml }));
     };
 
@@ -731,7 +731,8 @@ export async function renderPage(
   configDAT?: string | string[] | undefined,
   renderMode: RenderMode = 'ssr',
   patchForServer = false,
-  prebuildOnly = false
+  prebuildOnly = false,
+  dontStopOnFailed = false
 ): Promise<string> {
   ensureTempDirs();
 
@@ -855,7 +856,7 @@ export async function renderPage(
     }
   }
 
-  if (clientCode === undefined || (clientCode === "" && renderMode !== "srtws") || (!serverCode && !serverCodeDisabled)) {
+  /*if (clientCode === undefined || (clientCode === "" && renderMode !== "srtws") || (!serverCode && !serverCodeDisabled)) {
     //console.log(`[authtics] building bundle (${compiler}) for ${path.basename(tsxPath)}...`);
 
     const virtualServer = `
@@ -878,7 +879,7 @@ export async function renderPage(
       const rootEl = document.getElementById("root");
       if (rootEl) hydrateRoot(rootEl, React.createElement(Page));
     `;*/
-    const virtualClient = `
+    /*const virtualClient = `
       import React from "react";
       import { ${renderMode === 'csr' ? 'createRoot' : 'hydrateRoot'} } from "react-dom/client";
       ${usesDevPanel ? `import DevPanel from ${JSON.stringify(devPanelPath)};` : ""}
@@ -902,7 +903,7 @@ export async function renderPage(
       serverCode = await buildWithBabel(tsxPath, virtualServer, 'node');
       clientCode = await buildWithBabel(tsxPath, virtualClient, 'browser');
     } else {*/
-    if (compiler === 'esbuild') {
+    /*if (compiler === 'esbuild') {
       if (!serverCodeDisabled) {
         const builtServer = await buildWithEsbuild(
           virtualServer,
@@ -936,7 +937,7 @@ export async function renderPage(
     /*fs.writeFileSync(serverCjsPath, serverCode || "", "utf-8");
     writeTempFile(tempPath, JSON.stringify({ clientCode }));
     freshWrite = true;*/
-    if (serverCode) await fs.promises.writeFile(serverCjsPath, serverCode, "utf-8");
+    /*if (serverCode) await fs.promises.writeFile(serverCjsPath, serverCode, "utf-8");
     if (separateClientBundle) {
       await fs.promises.writeFile(clientBundlePath, clientCode ?? "", "utf-8");
       writeTempFile(tempPath, JSON.stringify({
@@ -955,7 +956,180 @@ export async function renderPage(
     }
     freshWrite = true;
     //console.log(`[authtics] bundle cached for ${path.basename(tsxPath)}`);
+  }*/
+  if (clientCode === undefined || (clientCode === "" && renderMode !== "srtws") || (!serverCode && !serverCodeDisabled)) {
+    try {
+      //console.log(`[authtics] building bundle (${compiler}) for ${path.basename(tsxPath)}...`);
+
+      const virtualServer = `
+        ${usesDevPanel ? `import DevPanel from ${JSON.stringify(devPanelPath)};` : ""}
+        import Page from ${JSON.stringify(tsxPath)};
+        export default Page;
+        ${usesDevPanel ? `export { DevPanel };` : ""}
+      `;
+
+      const virtualClient = `
+        import React from "react";
+        import { ${renderMode === 'csr' ? 'createRoot' : 'hydrateRoot'} } from "react-dom/client";
+        ${usesDevPanel ? `import DevPanel from ${JSON.stringify(devPanelPath)};` : ""}
+        import Page from ${JSON.stringify(tsxPath)};
+
+        ${usesDevPanel ? `
+        const panelEl = document.getElementById("authtics-dev-panel-root");
+        if (panelEl) ${renderMode === 'csr' ? `createRoot(panelEl).render(React.createElement(DevPanel));` : `hydrateRoot(panelEl, React.createElement(DevPanel));`}
+        ` : ""}
+        const rootEl = document.getElementById("root");
+        if (rootEl) {
+          ${
+            renderMode === 'csr'
+              ? `createRoot(rootEl).render(React.createElement(Page));`
+              : `hydrateRoot(rootEl, React.createElement(Page));`
+          }
+        }
+      `;
+
+      if (compiler === 'esbuild') {
+        if (!serverCodeDisabled) {
+          const builtServer = await buildWithEsbuild(
+            virtualServer,
+            process.cwd(),
+            'node',
+            patchForServer,
+            {
+              sourceMaps: enableDiagnostics,
+              minify: !enableDiagnostics,
+              outfile: serverCjsPath,
+              sourceMapUrl: path.basename(serverMapPath),
+            }
+          );
+          serverCode = builtServer.code;
+          serverMap = builtServer.map;
+        }
+        if (renderMode !== 'srtws') {
+          const built = await buildWithEsbuild(virtualClient, process.cwd(), 'browser', patchForServer, {
+            sourceMaps: enableDiagnostics,
+            minify: !enableDiagnostics,
+            outfile: clientBundlePath,
+            sourceMapUrl: clientMapUrl,
+          });
+          clientCode = built.code;
+          clientMap = built.map;
+        } else {
+          clientCode = "";
+        }
+      }
+
+      if (serverCode) await fs.promises.writeFile(serverCjsPath, serverCode, "utf-8");
+      if (separateClientBundle) {
+        await fs.promises.writeFile(clientBundlePath, clientCode ?? "", "utf-8");
+        writeTempFile(tempPath, JSON.stringify({
+          clientBundle: path.relative(process.cwd(), clientBundlePath),
+        }));
+      } else {
+        writeTempFile(tempPath, JSON.stringify({ clientCode }));
+      }
+      if (serverMap) await fs.promises.writeFile(serverMapPath, serverMap, "utf-8");
+      if (clientMap) await fs.promises.writeFile(clientMapPath, clientMap, "utf-8");
+      if (requiredMapArtifacts.includes(clientMapPath) && !clientMap) {
+        throw new Error(`[HostJS] Source-map build did not produce ${clientMapPath}`);
+      }
+      if (requiredMapArtifacts.includes(serverMapPath) && !serverMap) {
+        throw new Error(`[HostJS] Source-map build did not produce ${serverMapPath}`);
+      }
+      freshWrite = true;
+      const errorFilePath = `${tsxPath}.errors.txt`;
+if (fs.existsSync(errorFilePath)) {
+  await fs.promises.unlink(errorFilePath);
+}
+      //console.log(`[authtics] bundle cached for ${path.basename(tsxPath)}`);
+    /*} catch (err) {
+      if (dontStopOnFailed) {
+        // Save the build errors into a file next to the source file (e.g. filename.tsx.errors.txt)
+        const errorMsg = err instanceof Error ? (err.stack || err.message) : String(err);
+        const errorFilePath = `${tsxPath}.errors.txt`;
+        try {
+          await fs.promises.writeFile(errorFilePath, errorMsg, "utf-8");
+        } catch (writeErr) {
+          console.error(`[authtics] Failed to write build error file:`, writeErr);
+        }
+
+        // Fall back to reading previously successful build artifacts/cache from disk
+        try {
+          if (fs.existsSync(tempPath)) {
+            const parsed = JSON.parse(readTempFile(tempPath));
+            if (separateClientBundle) {
+              clientCode = fs.existsSync(clientBundlePath) ? fs.readFileSync(clientBundlePath, "utf-8") : "";
+            } else {
+              clientCode = parsed.clientCode || "";
+            }
+          }
+          if (enableDiagnostics && renderMode !== "srtws") {
+            if (fs.existsSync(clientMapPath)) clientMap = fs.readFileSync(clientMapPath, "utf-8");
+            if (!serverCodeDisabled && fs.existsSync(serverMapPath)) serverMap = fs.readFileSync(serverMapPath, "utf-8");
+          }
+          if (!serverCodeDisabled) {
+            serverCode = fs.existsSync(serverCjsPath) ? fs.readFileSync(serverCjsPath, "utf-8") : undefined;
+          }
+        } catch (fallbackErr) {
+          console.error(`[authtics] Failed to recover from fallback build artifacts:`, fallbackErr);
+        }
+      } else {
+        throw err;
+      }
+    }
+  }*/
+      } catch (err) {
+      console.error("[authtics] dontStopOnFailed caught error:", err);
+      if (dontStopOnFailed) {
+        // Save the build errors into a file next to the source file
+        const errorMsg = err instanceof Error ? (err.stack || err.message) : String(err);
+        const errorFilePath = `${tsxPath}.errors.txt`;
+        try {
+          await fs.promises.writeFile(errorFilePath, errorMsg, "utf-8");
+        } catch (writeErr) {
+          console.error(`[authtics] Failed to write build error file:`, writeErr);
+        }
+
+        // Fall back to reading previously successful build artifacts/cache from disk
+        try {
+          if (fs.existsSync(tempPath)) {
+            const parsed = JSON.parse(readTempFile(tempPath));
+            if (separateClientBundle) {
+  if (!fs.existsSync(clientBundlePath)) {
+    throw new Error("Previous client bundle is missing");
   }
+
+  clientCode = fs.readFileSync(clientBundlePath, "utf-8");
+} else {
+  if (typeof parsed.clientCode !== "string" || !parsed.clientCode) {
+    throw new Error("Previous client bundle is invalid");
+  }
+
+  clientCode = parsed.clientCode;
+}
+          }
+          if (enableDiagnostics && renderMode !== "srtws") {
+            if (fs.existsSync(clientMapPath)) clientMap = fs.readFileSync(clientMapPath, "utf-8");
+            if (!serverCodeDisabled && fs.existsSync(serverMapPath)) serverMap = fs.readFileSync(serverMapPath, "utf-8");
+          }
+          if (!serverCodeDisabled) {
+  if (!fs.existsSync(serverCjsPath)) {
+    throw new Error("Previous server bundle is missing");
+  }
+
+  serverCode = fs.readFileSync(serverCjsPath, "utf-8");
+          }
+
+          // FIX: Ensure freshWrite is false so it loads the cached server module safely without a query-string timestamp cache-buster
+          freshWrite = false;
+        } catch (fallbackErr) {
+          console.error(`[authtics] Failed to recover from fallback build artifacts:`, fallbackErr);
+        }
+      } else {
+        throw err;
+      }
+    }
+    }
 
   //fileHandler ? fileHandler(clientCode || "", `/${path.basename(tempPath).replace(".json", ".js").replace(".tsx_", ".").toLowerCase()}`) : null;
   if (clientCode !== undefined) fileHandler?.(clientCode, clientJsUrl);

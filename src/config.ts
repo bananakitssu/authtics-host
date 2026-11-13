@@ -54,6 +54,7 @@ export interface AuthticsConfig {
   blockedIPs?: string[];
   robots?: RobotsConfig;
   vpnDetection?: boolean;
+  dontStopOnFailed?: boolean;
 }
 
 export function defineConfig(config: AuthticsConfig): AuthticsConfig {
@@ -94,6 +95,8 @@ export function defineConfig(config: AuthticsConfig): AuthticsConfig {
     config.blockedIPs = [];
   if (config.vpnDetection === undefined)
     config.vpnDetection = false;
+  if (config.dontStopOnFailed === undefined)
+    config.dontStopOnFailed = false;
 
   return config;
 }
