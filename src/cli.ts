@@ -1143,7 +1143,7 @@ async function start() {
   const showPanel = config.devMode !== false;
   const autoPaging = config.autoPage !== false;
   const compiler: CompilerType = /*config.compilerType === 'babel' ? 'babel' : */'esbuild';
-  const prebuildOnly = config.buildTrigger === "prebuild";
+  const prebuildOnly = config.buildTrigger === "prebuilt";
   const hotReload: boolean = config.hotReload === true;
   const blockedIPs: string[] = config.blockedIPs;
   const robotsConfig = config.robots as RobotsConfig | undefined;
